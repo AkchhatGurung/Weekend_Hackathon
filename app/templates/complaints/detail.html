@@ -2,12 +2,17 @@
 {% block title %}{{ complaint.ticket_id }} · Smart Campus Grievances{% endblock %}
 {% block content %}
   <div class="page-heading">
-    <div><h1>{{ complaint.title }}</h1><p>{{ complaint.ticket_id }} · {{ complaint.status }}</p></div>
+    <div class="page-intro">
+      <p class="eyebrow">{{ complaint.ticket_id }}</p>
+      <h1>{{ complaint.title }}</h1>
+      <p><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></p>
+    </div>
     {% if complaint.reporter_id == g.user.id and complaint.status == 'Submitted' %}
       <a class="button secondary" href="{{ url_for('complaints.edit_complaint', complaint_id=complaint.id) }}">Edit complaint</a>
     {% endif %}
   </div>
   <section class="card">
+    <div class="card-heading"><h2>Complaint details</h2></div>
     <dl class="details">
       <dt>Category</dt><dd>{{ complaint.category.name }}</dd>
       <dt>Department</dt><dd>{{ complaint.department.name if complaint.department else 'Unassigned' }}</dd>
@@ -22,15 +27,21 @@
     </dl>
   </section>
   <section class="card">
-    <h2>History</h2>
-    <ol class="history">
-      {% for entry in complaint.history %}
-        <li>
-          <strong>{{ entry.action }}</strong>
-          {% if entry.new_status %}<span> — {{ entry.new_status }}</span>{% endif %}
-          <p>{{ entry.remarks or '' }} · {{ entry.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</p>
-        </li>
-      {% endfor %}
-    </ol>
+    <div class="card-heading"><h2>History</h2></div>
+    {% if complaint.history %}
+      <ol class="history">
+        {% for entry in complaint.history %}
+          <li>
+            <strong>{{ entry.action }}</strong>
+            {% if entry.new_status %}<span> — {{ entry.new_status }}</span>{% endif %}
+            <p>{{ entry.remarks or '' }} · {{ entry.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <div class="empty-state">
+        <p>No history has been recorded yet.</p>
+      </div>
+    {% endif %}
   </section>
 {% endblock %}

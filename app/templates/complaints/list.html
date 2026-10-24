@@ -2,7 +2,11 @@
 {% block title %}Complaints · Smart Campus Grievances{% endblock %}
 {% block content %}
   <div class="page-heading">
-    <div><h1>Complaints</h1><p>Track campus concerns and their current status.</p></div>
+    <div class="page-intro">
+      <p class="eyebrow">Campus support</p>
+      <h1>Complaints</h1>
+      <p>Track campus concerns and their current status.</p>
+    </div>
     {% if g.user.role in ('student', 'staff') %}
       <a class="button" href="{{ url_for('complaints.create_complaint') }}">Submit a complaint</a>
     {% endif %}
@@ -10,15 +14,16 @@
   {% if complaints %}
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Ticket</th><th>Title</th><th>Category</th><th>Department</th><th>Status</th><th>Submitted</th></tr></thead>
+        <caption class="visually-hidden">Complaints visible to your account</caption>
+        <thead><tr><th scope="col">Ticket</th><th scope="col">Title</th><th scope="col">Category</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col">Submitted</th></tr></thead>
         <tbody>
           {% for complaint in complaints %}
             <tr>
-              <td><a href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.ticket_id }}</a></td>
+              <td><a class="ticket-link" href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.ticket_id }}</a></td>
               <td>{{ complaint.title }}</td>
               <td>{{ complaint.category.name }}</td>
               <td>{{ complaint.department.name if complaint.department else 'Unassigned' }}</td>
-              <td><span class="status">{{ complaint.status }}</span></td>
+              <td><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></td>
               <td>{{ complaint.created_at.strftime('%Y-%m-%d') }}</td>
             </tr>
           {% endfor %}
@@ -26,6 +31,13 @@
       </table>
     </div>
   {% else %}
-    <section class="card"><p>No complaints to display.</p></section>
+    <section class="empty-state" aria-labelledby="empty-complaints-title">
+      <span class="empty-state-icon" aria-hidden="true">+</span>
+      <h2 id="empty-complaints-title">Nothing to review yet</h2>
+      <p>When complaints are submitted or assigned to you, they will appear here.</p>
+      {% if g.user.role in ('student', 'staff') %}
+        <a class="button" href="{{ url_for('complaints.create_complaint') }}">Submit a complaint</a>
+      {% endif %}
+    </section>
   {% endif %}
 {% endblock %}

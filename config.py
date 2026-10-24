@@ -3,8 +3,8 @@ from pathlib import Path
 
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY")
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
+    SECRET_KEY = os.environ.get("sb_publishable_9oqX4bnEkJqi6xy3Nx4B8Q_40ngCsEo")
+    SQLALCHEMY_DATABASE_URI = os.environ.get("https://yzvhijvhatcpvnvmlnve.supabase.co")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

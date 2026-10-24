@@ -49,3 +49,9 @@ Run the focused test suite with:
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+## Frontend preview
+
+Start the app with the local environment above and open `http://127.0.0.1:5000/login`. Sign in with the administrator created by `flask create-admin` to preview the administration screens. To preview the complaint list and submission form, create a department and category in Administration, create a student or staff account, then sign in with that account. The complaint list shows its designed empty state until a complaint is submitted; the interface does not seed or hardcode user or complaint records.
+
+The shared layout and navigation are in `app/templates/base.html`; page templates are grouped under `auth/`, `complaints/`, and `admin/`. Reusable responsive styles are in `app/static/style.css`, with progressive-enhancement navigation, dismissible notices, and form submission feedback in `app/static/app.js`.

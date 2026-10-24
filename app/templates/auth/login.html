@@ -2,14 +2,20 @@
 {% block title %}Sign in · Smart Campus Grievances{% endblock %}
 {% block content %}
   <section class="card narrow">
+    <p class="eyebrow">Welcome back</p>
     <h1>Sign in</h1>
-    <form method="post">
+    <p>Access your campus complaint workspace.</p>
+    <form method="post" data-loading-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label for="email">Email</label>
-      <input id="email" name="email" type="email" autocomplete="username" required maxlength="255">
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required>
-      <button type="submit">Sign in</button>
+      <div class="form-field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required maxlength="255">
+      </div>
+      <div class="form-field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" data-loading-text="Signing in…">Sign in</button>
     </form>
   </section>
 {% endblock %}
