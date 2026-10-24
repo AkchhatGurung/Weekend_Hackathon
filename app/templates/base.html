@@ -54,7 +54,9 @@
         </form>
       {% else %}
         <a href="{{ url_for('auth.login') }}" {% if request.endpoint == 'auth.login' %}aria-current="page"{% endif %}>Sign in</a>
-        <a href="{{ url_for('auth.register') }}" {% if request.endpoint == 'auth.register' %}aria-current="page"{% endif %}>Create account</a>
+        {% if request.endpoint != 'auth.login' %}
+          <a href="{{ url_for('auth.register') }}" {% if request.endpoint == 'auth.register' %}aria-current="page"{% endif %}>Create account</a>
+        {% endif %}
       {% endif %}
       </nav>
     </div>
