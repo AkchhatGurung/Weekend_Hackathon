@@ -3,9 +3,9 @@
 {% block content %}
   <div class="page-heading">
     <div class="page-intro">
-      <p class="eyebrow">{{ 'Student portal' if g.user.role == 'student' else 'Campus support' }}</p>
-      <h1>{{ 'Welcome, ' ~ g.user.name if g.user.role == 'student' else ('Your complaints' if g.user.role == 'staff' else 'Complaints') }}</h1>
-      <p>{{ 'Review your campus concerns and keep track of what happens next.' if g.user.role == 'student' else 'Track campus concerns and their current status.' }}</p>
+      <p class="eyebrow">{{ 'Department officer workspace' if g.user.role == 'officer' else ('Student portal' if g.user.role == 'student' else 'Campus support') }}</p>
+      <h1>{{ 'Assigned complaint queue' if g.user.role == 'officer' else ('Welcome, ' ~ g.user.name if g.user.role == 'student' else ('Your complaints' if g.user.role == 'staff' else 'Complaints')) }}</h1>
+      <p>{{ 'Review complaints visible to your department and open a ticket to view its full details.' if g.user.role == 'officer' else ('Review your campus concerns and keep track of what happens next.' if g.user.role == 'student' else 'Track campus concerns and their current status.') }}</p>
     </div>
   </div>
   {% if complaints %}
@@ -24,7 +24,28 @@
           <option value="rejected">Rejected</option>
         </select>
       </div>
+      <div class="form-field">
+        <label for="complaint-priority">Filter by priority</label>
+        <select id="complaint-priority" disabled data-complaint-priority>
+          <option value="">All priorities</option>
+          {% for priority in complaints|map(attribute='priority')|unique|sort %}
+            <option value="{{ priority|lower }}">{{ priority }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="complaint-category">Filter by category</label>
+        <select id="complaint-category" disabled data-complaint-category>
+          <option value="">All categories</option>
+          {% for category in complaints|map(attribute='category.name')|unique|sort %}
+            <option value="{{ category|lower }}">{{ category }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
+    {% if g.user.role == 'officer' %}
+      <p class="form-hint">The server limits this queue to complaints in your assigned department. Search and filters apply only to the records returned by the server.</p>
+    {% endif %}
     <p class="form-hint filter-hint" data-filter-status aria-live="polite">{{ complaints|length }} complaints</p>
     <div class="table-wrap">
       <table>
@@ -45,6 +66,8 @@
             <tr
               data-complaint-item
               data-status="{{ complaint.status|lower }}"
+              data-priority="{{ complaint.priority|lower }}"
+              data-category="{{ complaint.category.name|lower }}"
               data-search="{{ complaint.ticket_id }} {{ complaint.title }} {{ complaint.category.name }} {{ complaint.department.name if complaint.department else 'Unassigned' }}">
               <td><a class="ticket-link" href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.ticket_id }}</a></td>
               <td>{{ complaint.title }}</td>

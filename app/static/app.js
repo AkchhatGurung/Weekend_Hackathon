@@ -45,6 +45,8 @@
   document.querySelectorAll("[data-dashboard-filters]").forEach((filters) => {
     const searchInput = filters.querySelector("[data-complaint-search]");
     const statusSelect = filters.querySelector("[data-complaint-status]");
+    const prioritySelect = filters.querySelector("[data-complaint-priority]");
+    const categorySelect = filters.querySelector("[data-complaint-category]");
     const list = document.querySelector("[data-complaint-list]");
     const filterEmpty = document.querySelector("[data-filter-empty]");
     const filterStatus = document.querySelector("[data-filter-status]");
@@ -63,6 +65,8 @@
     const updateComplaints = () => {
       const query = searchInput.value.trim().toLocaleLowerCase();
       const status = statusSelect.value;
+      const priority = prioritySelect?.value ?? "";
+      const category = categorySelect?.value ?? "";
       let visibleCount = 0;
 
       items.forEach((item) => {
@@ -70,7 +74,9 @@
           .toLocaleLowerCase()
           .includes(query);
         const matchesStatus = !status || item.getAttribute("data-status") === status;
-        const isVisible = matchesQuery && matchesStatus;
+        const matchesPriority = !priority || item.getAttribute("data-priority") === priority;
+        const matchesCategory = !category || item.getAttribute("data-category") === category;
+        const isVisible = matchesQuery && matchesStatus && matchesPriority && matchesCategory;
         item.hidden = !isVisible;
         if (isVisible) visibleCount += 1;
       });
@@ -81,8 +87,12 @@
 
     searchInput.disabled = false;
     statusSelect.disabled = false;
+    if (prioritySelect instanceof HTMLSelectElement) prioritySelect.disabled = false;
+    if (categorySelect instanceof HTMLSelectElement) categorySelect.disabled = false;
     searchInput.addEventListener("input", updateComplaints);
     statusSelect.addEventListener("change", updateComplaints);
+    prioritySelect?.addEventListener("change", updateComplaints);
+    categorySelect?.addEventListener("change", updateComplaints);
   });
 
   document.querySelectorAll("form[data-loading-form]").forEach((form) => {

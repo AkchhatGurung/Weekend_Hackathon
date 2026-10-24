@@ -18,6 +18,11 @@
       <dt>Ticket ID</dt><dd>{{ complaint.ticket_id }}</dd>
       <dt>Category</dt><dd>{{ complaint.category.name }}</dd>
       <dt>Department</dt><dd>{{ complaint.department.name if complaint.department else 'Unassigned' }}</dd>
+      <dt>Priority</dt><dd><span class="badge badge-priority-{{ complaint.priority|lower }}">{{ complaint.priority }}</span></dd>
+      {% if g.user.role in ('officer', 'admin') %}
+        <dt>Assignment</dt>
+        <dd>{{ 'Officer account #' ~ complaint.assigned_to if complaint.assigned_to else 'Not assigned' }}</dd>
+      {% endif %}
       <dt>Current status</dt><dd><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></dd>
       <dt>Submission date</dt><dd><time datetime="{{ complaint.created_at.isoformat() }}">{{ complaint.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</time></dd>
       <dt>Description</dt><dd class="preserve-lines">{{ complaint.description }}</dd>
@@ -41,6 +46,39 @@
       {% endif %}
     </dl>
   </section>
+
+  {% if g.user.role in ('officer', 'admin') %}
+    <section class="card" aria-labelledby="status-management-heading">
+      <div class="card-heading"><h2 id="status-management-heading">Manage status</h2></div>
+      <p role="status">Status updates are not available yet because this application has no complaint status-update route. No changes can be submitted from this page.</p>
+      <form aria-describedby="status-management-note">
+        <fieldset disabled>
+          <legend>Update complaint status</legend>
+          <div class="form-field">
+            <label for="status">New status</label>
+            <select id="status" name="status">
+              {% for status in ('Submitted', 'In Progress', 'Resolved', 'Rejected') %}
+                <option value="{{ status }}" {% if complaint.status == status %}selected{% endif %}>{{ status }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="remarks">Remarks</label>
+            <textarea id="remarks" name="remarks" maxlength="5000"></textarea>
+          </div>
+          <div class="form-field">
+            <label for="resolution_notes">Resolution notes (required when resolving)</label>
+            <textarea id="resolution_notes" name="resolution_notes" maxlength="5000"></textarea>
+          </div>
+          <div class="form-field">
+            <label for="rejection_reason">Rejection reason (required when rejecting)</label>
+            <textarea id="rejection_reason" name="rejection_reason" maxlength="5000"></textarea>
+          </div>
+        </fieldset>
+        <span id="status-management-note" class="form-hint">A secure, server-authorized workflow endpoint is required before these controls can be enabled.</span>
+      </form>
+    </section>
+  {% endif %}
 
   <section class="card" aria-labelledby="history-heading">
     <div class="card-heading"><h2 id="history-heading">Status history</h2></div>
