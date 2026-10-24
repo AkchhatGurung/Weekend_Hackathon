@@ -1,20 +1,29 @@
 from functools import wraps
 
-from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask_login import current_user, login_user, logout_user
 
 from app import db
 from app.models import User
+from app.extensions import login_manager
 
 auth_bp = Blueprint("auth", __name__)
 
 
 @auth_bp.before_app_request
 def load_logged_in_user():
-    user_id = session.get("user_id")
-    g.user = db.session.get(User, user_id) if user_id is not None else None
+    g.user = current_user if current_user.is_authenticated else None
     if g.user is not None and not g.user.is_active:
-        session.clear()
+        logout_user()
         g.user = None
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        return db.session.get(User, int(user_id))
+    except (TypeError, ValueError):
+        return None
 
 
 def login_required(view):
@@ -57,8 +66,7 @@ def login():
         if user is None or not user.is_active or not user.check_password(password):
             error = "Invalid email or password."
         else:
-            session.clear()
-            session["user_id"] = user.id
+            login_user(user)
             return redirect(url_for("complaints.list_complaints"))
 
     if error:
@@ -69,6 +77,6 @@ def login():
 @auth_bp.post("/logout")
 @login_required
 def logout():
-    session.clear()
+    logout_user()
     flash("You have signed out.", "success")
     return redirect(url_for("auth.login"))

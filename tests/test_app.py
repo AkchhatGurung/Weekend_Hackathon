@@ -74,6 +74,14 @@ class CampusAppTests(unittest.TestCase):
             db.engine.dispose()
         self.upload_dir.cleanup()
 
+    def test_health_check_does_not_expose_configuration(self):
+        response = self.client.get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json, {"status": "ok"})
+        self.assertNotIn(b"DATABASE_URL", response.data)
+        self.assertNotIn(b"SECRET_KEY", response.data)
+
     def login(self, email):
         return self.client.post(
             "/login",

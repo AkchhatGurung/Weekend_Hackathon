@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from flask_login import UserMixin
 from werkzeug.security import check_password_hash
 
 from app import db
@@ -24,7 +25,7 @@ class Department(db.Model):
     complaints = db.relationship("Complaint", back_populates="department")
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id = db.Column(ID_TYPE, primary_key=True)

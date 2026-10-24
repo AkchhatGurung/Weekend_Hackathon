@@ -1,17 +1,12 @@
 import os
 
 import click
-from flask import Flask, flash, redirect, render_template, url_for
-from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, jsonify, flash, redirect, render_template, url_for
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from werkzeug.security import generate_password_hash
 
 from config import Config
-
-db = SQLAlchemy()
-migrate = Migrate()
-csrf = CSRFProtect()
+from app.extensions import csrf, db, login_manager, migrate
 
 
 def create_app(test_config=None):
@@ -28,6 +23,9 @@ def create_app(test_config=None):
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     db.init_app(app)
     migrate.init_app(app, db)
+    login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
+    login_manager.login_message = "Please sign in to continue."
     csrf.init_app(app)
 
     from app import models
@@ -38,6 +36,10 @@ def create_app(test_config=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(complaints_bp)
     app.register_blueprint(management_bp)
+
+    @app.get("/health")
+    def health():
+        return jsonify(status="ok")
 
     @app.get("/")
     def index():
