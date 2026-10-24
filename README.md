@@ -1,3 +1,51 @@
-# Weekend_Hackathon
+# Smart Campus Complaint and Grievance Management System
 
-yooo
+Phase 1 provides a Flask application, login and role checks, complaint submission/list/detail/edit, admin maintenance for users/departments/categories, CSRF protection, password hashing, image validation, and complaint history records for submissions and edits.
+
+Complaint status transitions, feedback and analytics are not implemented in this phase. Complaints are not physically deleted because their history is retained as an audit record. Users, departments and categories can be deactivated.
+
+## Requirements
+
+- Python 3.10 or newer
+- PostgreSQL
+
+## Local setup (PowerShell)
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+
+$env:SECRET_KEY = "replace-with-a-long-random-secret"
+$env:DATABASE_URL = "postgresql+psycopg://postgres:password@localhost:5432/smart_campus"
+$env:FLASK_APP = "app:create_app"
+
+flask db upgrade
+flask create-admin
+flask run
+```
+
+Create an empty PostgreSQL database before applying the checked-in initial migration with `flask db upgrade`. Use `flask db migrate -m "Describe schema change"` for later model changes, review the generated revision, then apply it with `flask db upgrade`. Keep `SECRET_KEY`, database credentials, and production upload configuration in environment variables, not source control. Set `SESSION_COOKIE_SECURE=true` when serving over HTTPS. `UPLOAD_FOLDER` defaults to an `uploads` directory in the project root.
+
+The `smart_campus_grievance_schema.sql` file is the shared reference schema. For a new database, use the migrations generated from the Flask models rather than running both that starter SQL and migrations.
+
+## Phase 1 routes
+
+- `GET /login`, `POST /login`, `POST /logout`
+- `GET /complaints`, `GET|POST /complaints/new`
+- `GET /complaints/<id>`, `GET|POST /complaints/<id>/edit`
+- `GET /complaints/<id>/image`
+- `GET /admin`
+- `POST /admin/departments`, `POST /admin/departments/<id>`
+- `POST /admin/categories`, `POST /admin/categories/<id>`
+- `POST /admin/users`, `POST /admin/users/<id>`
+
+Students and staff can access their own complaints; officers can access complaints assigned to their department; administrators can access all complaints and manage reference data and accounts. Complaint editing is limited to its reporter while status is `Submitted`. Status changes are intentionally reserved for the workflow phase.
+
+## Tests
+
+Run the focused test suite with:
+
+```powershell
+python -m unittest discover -s tests -v
+```

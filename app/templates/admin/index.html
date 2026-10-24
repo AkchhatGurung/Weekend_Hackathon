@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Administration · Smart Campus Grievances{% endblock %}
+{% block content %}
+  <h1>Administration</h1>
+  <p>Create and maintain reference data and user accounts. Records are deactivated rather than deleted to preserve references and complaint history.</p>
+  <section class="card">
+    <h2>Departments</h2>
+    <form method="post" action="{{ url_for('management.create_department') }}" class="compact-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="new-department">New department</label>
+      <input id="new-department" name="name" maxlength="100" required>
+      <button type="submit">Add department</button>
+    </form>
+    {% for department in departments %}
+      <form method="post" action="{{ url_for('management.update_department', department_id=department.id) }}" class="admin-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input aria-label="Department name" name="name" value="{{ department.name }}" maxlength="100" required>
+        <label class="check"><input type="checkbox" name="is_active" {% if department.is_active %}checked{% endif %}> Active</label>
+        <button type="submit">Save</button>
+      </form>
+    {% endfor %}
+  </section>
+  <section class="card">
+    <h2>Categories</h2>
+    <form method="post" action="{{ url_for('management.create_category') }}" class="compact-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="new-category">New category</label>
+      <input id="new-category" name="name" maxlength="80" required>
+      <label for="new-category-department">Default department</label>
+      <select id="new-category-department" name="department_id">
+        <option value="">Unassigned</option>
+        {% for department in departments if department.is_active %}
+          <option value="{{ department.id }}">{{ department.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Add category</button>
+    </form>
+    {% for category in categories %}
+      <form method="post" action="{{ url_for('management.update_category', category_id=category.id) }}" class="admin-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input aria-label="Category name" name="name" value="{{ category.name }}" maxlength="80" required>
+        <select aria-label="Default department" name="department_id">
+          <option value="">Unassigned</option>
+          {% for department in departments if department.is_active %}
+            <option value="{{ department.id }}" {% if category.default_department_id == department.id %}selected{% endif %}>{{ department.name }}</option>
+          {% endfor %}
+        </select>
+        <label class="check"><input type="checkbox" name="is_active" {% if category.is_active %}checked{% endif %}> Active</label>
+        <button type="submit">Save</button>
+      </form>
+    {% endfor %}
+  </section>
+  <section class="card">
+    <h2>User accounts</h2>
+    <form method="post" action="{{ url_for('management.create_user') }}" class="compact-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="new-user-name">Name</label><input id="new-user-name" name="name" maxlength="120" required>
+      <label for="new-user-email">Email</label><input id="new-user-email" name="email" type="email" maxlength="255" required>
+      <label for="new-user-password">Initial password (12+ characters)</label><input id="new-user-password" name="password" type="password" minlength="12" required>
+      <label for="new-user-role">Role</label>
+      <select id="new-user-role" name="role">{% for role in ('student', 'staff', 'officer', 'admin') %}<option value="{{ role }}">{{ role|title }}</option>{% endfor %}</select>
+      <label for="new-user-department">Department</label>
+      <select id="new-user-department" name="department_id">
+        <option value="">Unassigned</option>
+        {% for department in departments if department.is_active %}<option value="{{ department.id }}">{{ department.name }}</option>{% endfor %}
+      </select>
+      <button type="submit">Create user</button>
+    </form>
+    {% for user in users %}
+      <form method="post" action="{{ url_for('management.update_user', user_id=user.id) }}" class="admin-row user-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input aria-label="User name" name="name" value="{{ user.name }}" maxlength="120" required>
+        <input aria-label="User email" name="email" type="email" value="{{ user.email }}" maxlength="255" required>
+        <select aria-label="User role" name="role">{% for role in ('student', 'staff', 'officer', 'admin') %}<option value="{{ role }}" {% if user.role == role %}selected{% endif %}>{{ role|title }}</option>{% endfor %}</select>
+        <select aria-label="User department" name="department_id">
+          <option value="">Unassigned</option>
+          {% for department in departments if department.is_active %}<option value="{{ department.id }}" {% if user.department_id == department.id %}selected{% endif %}>{{ department.name }}</option>{% endfor %}
+        </select>
+        <input aria-label="New password (optional)" name="password" type="password" minlength="12" placeholder="New password (optional)">
+        <label class="check"><input type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %}> Active</label>
+        <button type="submit">Save</button>
+      </form>
+    {% endfor %}
+  </section>
+{% endblock %}

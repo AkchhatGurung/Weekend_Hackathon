@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Smart Campus Grievances{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('complaints.list_complaints') if g.user else url_for('auth.login') }}">Smart Campus Grievances</a>
+    <nav>
+      {% if g.user %}
+        <span>{{ g.user.name }} · {{ g.user.role|title }}</span>
+        <a href="{{ url_for('complaints.list_complaints') }}">Complaints</a>
+        {% if g.user.role == 'student' or g.user.role == 'staff' %}
+          <a href="{{ url_for('complaints.create_complaint') }}">New complaint</a>
+        {% endif %}
+        {% if g.user.role == 'admin' %}<a href="{{ url_for('management.index') }}">Administration</a>{% endif %}
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link-button">Sign out</button>
+        </form>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}">Sign in</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

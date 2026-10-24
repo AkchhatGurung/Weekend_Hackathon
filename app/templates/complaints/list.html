@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Complaints · Smart Campus Grievances{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div><h1>Complaints</h1><p>Track campus concerns and their current status.</p></div>
+    {% if g.user.role in ('student', 'staff') %}
+      <a class="button" href="{{ url_for('complaints.create_complaint') }}">Submit a complaint</a>
+    {% endif %}
+  </div>
+  {% if complaints %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ticket</th><th>Title</th><th>Category</th><th>Department</th><th>Status</th><th>Submitted</th></tr></thead>
+        <tbody>
+          {% for complaint in complaints %}
+            <tr>
+              <td><a href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.ticket_id }}</a></td>
+              <td>{{ complaint.title }}</td>
+              <td>{{ complaint.category.name }}</td>
+              <td>{{ complaint.department.name if complaint.department else 'Unassigned' }}</td>
+              <td><span class="status">{{ complaint.status }}</span></td>
+              <td>{{ complaint.created_at.strftime('%Y-%m-%d') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <section class="card"><p>No complaints to display.</p></section>
+  {% endif %}
+{% endblock %}

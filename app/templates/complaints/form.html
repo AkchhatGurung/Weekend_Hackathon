@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit complaint' if complaint else 'New complaint' }} · Smart Campus Grievances{% endblock %}
+{% block content %}
+  <section class="card">
+    <h1>{{ 'Edit complaint ' ~ complaint.ticket_id if complaint else 'Submit a complaint' }}</h1>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="title">Title</label>
+      <input id="title" name="title" maxlength="200" required value="{{ request.form.get('title', complaint.title if complaint else '') }}">
+      <label for="category_id">Category</label>
+      <select id="category_id" name="category_id" required>
+        <option value="">Choose a category</option>
+        {% for category in categories %}
+          <option value="{{ category.id }}" {% if request.form.get('category_id', complaint.category_id if complaint else '')|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+        {% endfor %}
+      </select>
+      <label for="description">Description</label>
+      <textarea id="description" name="description" maxlength="10000" required>{{ request.form.get('description', complaint.description if complaint else '') }}</textarea>
+      <label for="location">Location</label>
+      <input id="location" name="location" maxlength="200" required value="{{ request.form.get('location', complaint.location if complaint else '') }}">
+      <label for="priority">Priority</label>
+      <select id="priority" name="priority">
+        {% for priority in ('Low', 'Normal', 'High', 'Urgent') %}
+          <option value="{{ priority }}" {% if request.form.get('priority', complaint.priority if complaint else 'Normal') == priority %}selected{% endif %}>{{ priority }}</option>
+        {% endfor %}
+      </select>
+      <label for="image">Image (JPEG, PNG or WebP; up to 5 MB)</label>
+      <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp">
+      {% if complaint and complaint.image_key %}
+        <p>Current image: <a href="{{ url_for('complaints.complaint_image', complaint_id=complaint.id) }}">view image</a></p>
+      {% endif %}
+      <div class="actions">
+        <button type="submit">{{ 'Save changes' if complaint else 'Submit complaint' }}</button>
+        <a href="{{ url_for('complaints.list_complaints') }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

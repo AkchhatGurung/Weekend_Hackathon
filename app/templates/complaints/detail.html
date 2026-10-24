@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ complaint.ticket_id }} · Smart Campus Grievances{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div><h1>{{ complaint.title }}</h1><p>{{ complaint.ticket_id }} · {{ complaint.status }}</p></div>
+    {% if complaint.reporter_id == g.user.id and complaint.status == 'Submitted' %}
+      <a class="button secondary" href="{{ url_for('complaints.edit_complaint', complaint_id=complaint.id) }}">Edit complaint</a>
+    {% endif %}
+  </div>
+  <section class="card">
+    <dl class="details">
+      <dt>Category</dt><dd>{{ complaint.category.name }}</dd>
+      <dt>Department</dt><dd>{{ complaint.department.name if complaint.department else 'Unassigned' }}</dd>
+      <dt>Reporter</dt><dd>{{ complaint.reporter.name }}</dd>
+      <dt>Location</dt><dd>{{ complaint.location }}</dd>
+      <dt>Priority</dt><dd>{{ complaint.priority }}</dd>
+      <dt>Description</dt><dd class="preserve-lines">{{ complaint.description }}</dd>
+      <dt>Submitted</dt><dd>{{ complaint.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</dd>
+      {% if complaint.image_key %}
+        <dt>Image</dt><dd><a href="{{ url_for('complaints.complaint_image', complaint_id=complaint.id) }}">View uploaded image</a></dd>
+      {% endif %}
+    </dl>
+  </section>
+  <section class="card">
+    <h2>History</h2>
+    <ol class="history">
+      {% for entry in complaint.history %}
+        <li>
+          <strong>{{ entry.action }}</strong>
+          {% if entry.new_status %}<span> — {{ entry.new_status }}</span>{% endif %}
+          <p>{{ entry.remarks or '' }} · {{ entry.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+{% endblock %}
