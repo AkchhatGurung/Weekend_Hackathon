@@ -222,6 +222,64 @@ def cancel_complaint(complaint, actor, remarks="Complaint cancelled by reporter.
     return complaint
 
 
+def update_complaint_status(
+    complaint,
+    actor,
+    status,
+    remarks="",
+    resolution_notes="",
+    rejection_reason="",
+):
+    if actor is None or actor.role not in {"officer", "admin"}:
+        raise ValueError("You are not allowed to update complaint status.")
+    if not can_access_complaint(actor, complaint):
+        raise ValueError("You are not allowed to update this complaint.")
+    if complaint.status not in {"Submitted", "In Progress"}:
+        raise ValueError("Only open complaints can be updated.")
+    if status not in {"In Progress", "Resolved", "Rejected"}:
+        raise ValueError("Choose a valid status.")
+    if status == complaint.status:
+        raise ValueError("Choose a different status from the current status.")
+
+    remarks = (remarks or "").strip()
+    if len(remarks) > 5000:
+        raise ValueError("Remarks must be 5,000 characters or fewer.")
+
+    if status == "Resolved":
+        resolution_notes = _validate_complaint_text(
+            resolution_notes, "Resolution notes", 5000
+        )
+        complaint.resolution_notes = resolution_notes
+        complaint.rejection_reason = None
+        complaint.resolved_at = utcnow()
+    elif status == "Rejected":
+        rejection_reason = _validate_complaint_text(
+            rejection_reason, "Rejection reason", 5000
+        )
+        complaint.rejection_reason = rejection_reason
+        complaint.resolution_notes = None
+        complaint.resolved_at = None
+    else:
+        complaint.resolution_notes = None
+        complaint.rejection_reason = None
+        complaint.resolved_at = None
+
+    old_status = complaint.status
+    complaint.status = status
+    db.session.add(
+        ComplaintHistory(
+            complaint=complaint,
+            actor_id=actor.id,
+            action="Status updated",
+            old_status=old_status,
+            new_status=status,
+            remarks=remarks or None,
+        )
+    )
+    db.session.flush()
+    return complaint
+
+
 def list_complaints(
     *, reporter_id=None, department_id=None, status=None, category_id=None,
     date_from=None, date_to=None, page=None, per_page=20

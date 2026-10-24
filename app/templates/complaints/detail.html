@@ -24,7 +24,7 @@
       <dt>Priority</dt><dd><span class="badge badge-priority-{{ complaint.priority|lower }}">{{ complaint.priority }}</span></dd>
       {% if g.user.role in ('officer', 'admin') %}
         <dt>Assignment</dt>
-        <dd>{{ 'Officer account #' ~ complaint.assigned_to if complaint.assigned_to else 'Not assigned' }}</dd>
+        <dd>{{ 'Assigned' if complaint.assigned_to else 'Not assigned' }}</dd>
       {% endif %}
       <dt>Current status</dt><dd><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></dd>
       <dt>Submission date</dt><dd><time datetime="{{ complaint.created_at.isoformat() }}">{{ complaint.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</time></dd>
@@ -50,35 +50,37 @@
     </dl>
   </section>
 
-  {% if g.user.role in ('officer', 'admin') %}
+  {% if g.user.role in ('officer', 'admin') and complaint.status in ('Submitted', 'In Progress') %}
     <section class="card" aria-labelledby="status-management-heading">
       <div class="card-heading"><h2 id="status-management-heading">Manage status</h2></div>
-      <p role="status">Status updates are not available yet because this application has no complaint status-update route. No changes can be submitted from this page.</p>
-      <form aria-describedby="status-management-note">
-        <fieldset disabled>
-          <legend>Update complaint status</legend>
-          <div class="form-field">
-            <label for="status">New status</label>
-            <select id="status" name="status">
-              {% for status in ('Submitted', 'In Progress', 'Resolved', 'Rejected') %}
-                <option value="{{ status }}" {% if complaint.status == status %}selected{% endif %}>{{ status }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-field">
-            <label for="remarks">Remarks</label>
-            <textarea id="remarks" name="remarks" maxlength="5000"></textarea>
-          </div>
-          <div class="form-field">
-            <label for="resolution_notes">Resolution notes (required when resolving)</label>
-            <textarea id="resolution_notes" name="resolution_notes" maxlength="5000"></textarea>
-          </div>
-          <div class="form-field">
-            <label for="rejection_reason">Rejection reason (required when rejecting)</label>
-            <textarea id="rejection_reason" name="rejection_reason" maxlength="5000"></textarea>
-          </div>
-        </fieldset>
-        <span id="status-management-note" class="form-hint">A secure, server-authorized workflow endpoint is required before these controls can be enabled.</span>
+      <form method="post" action="{{ url_for('complaints.update_complaint_status', complaint_id=complaint.id) }}" data-loading-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-field">
+          <label for="status">New status</label>
+          <select id="status" name="status" required data-status-select>
+            <option value="">Choose a status</option>
+            {% if complaint.status == 'Submitted' %}
+              <option value="In Progress">In Progress</option>
+            {% endif %}
+            <option value="Resolved">Resolved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="remarks">Remarks (optional)</label>
+          <textarea id="remarks" name="remarks" maxlength="5000"></textarea>
+        </div>
+        <div class="form-field" data-resolution-field hidden>
+          <label for="resolution_notes">Resolution notes (required when resolving)</label>
+          <textarea id="resolution_notes" name="resolution_notes" maxlength="5000" data-resolution-notes></textarea>
+        </div>
+        <div class="form-field" data-rejection-field hidden>
+          <label for="rejection_reason">Rejection reason (required when rejecting)</label>
+          <textarea id="rejection_reason" name="rejection_reason" maxlength="5000" data-rejection-reason></textarea>
+        </div>
+        <div class="actions">
+          <button type="submit" data-loading-text="Updating status…">Update status</button>
+        </div>
       </form>
     </section>
   {% endif %}
@@ -102,4 +104,27 @@
       </div>
     {% endif %}
   </section>
+  {% if g.user.role in ('officer', 'admin') and complaint.status in ('Submitted', 'In Progress') %}
+    <script>
+      (() => {
+        const status = document.querySelector("[data-status-select]");
+        const resolutionField = document.querySelector("[data-resolution-field]");
+        const resolutionNotes = document.querySelector("[data-resolution-notes]");
+        const rejectionField = document.querySelector("[data-rejection-field]");
+        const rejectionReason = document.querySelector("[data-rejection-reason]");
+
+        const updateRequiredFields = () => {
+          const isResolved = status.value === "Resolved";
+          const isRejected = status.value === "Rejected";
+          resolutionField.hidden = !isResolved;
+          resolutionNotes.required = isResolved;
+          rejectionField.hidden = !isRejected;
+          rejectionReason.required = isRejected;
+        };
+
+        status.addEventListener("change", updateRequiredFields);
+        updateRequiredFields();
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

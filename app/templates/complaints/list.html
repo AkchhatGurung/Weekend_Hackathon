@@ -1,51 +1,187 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Student dashboard' if g.user.role == 'student' else 'Complaints' }} · Smart Campus Grievances{% endblock %}
+{% block title %}{{ 'Admin dashboard' if g.user.role == 'admin' else ('Student dashboard' if g.user.role == 'student' else 'Complaints') }} · Smart Campus Grievances{% endblock %}
 {% block content %}
   <div class="page-heading">
     <div class="page-intro">
-      <p class="eyebrow">{{ 'Department officer workspace' if g.user.role == 'officer' else ('Student portal' if g.user.role == 'student' else 'Campus support') }}</p>
-      <h1>{{ 'Assigned complaint queue' if g.user.role == 'officer' else ('Welcome, ' ~ g.user.name if g.user.role == 'student' else ('Your complaints' if g.user.role == 'staff' else 'Complaints')) }}</h1>
-      <p>{{ 'Review complaints visible to your department and open a ticket to view its full details.' if g.user.role == 'officer' else ('Review your campus concerns and keep track of what happens next.' if g.user.role == 'student' else 'Track campus concerns and their current status.') }}</p>
+      <p class="eyebrow">{{ 'Administrator workspace' if g.user.role == 'admin' else ('Department officer workspace' if g.user.role == 'officer' else ('Student portal' if g.user.role == 'student' else 'Campus support')) }}</p>
+      <h1>{{ 'Admin dashboard' if g.user.role == 'admin' else ('Assigned complaint queue' if g.user.role == 'officer' else ('Welcome, ' ~ g.user.name if g.user.role == 'student' else 'Your complaints')) }}</h1>
+      <p>{{ 'Review complaint trends and manage campus reference data and accounts.' if g.user.role == 'admin' else ('Review complaints visible to your department and open a ticket to view its full details.' if g.user.role == 'officer' else ('Review your campus concerns and keep track of what happens next.' if g.user.role == 'student' else 'Track campus concerns and their current status.')) }}</p>
     </div>
+    {% if g.user.role == 'admin' %}
+      <a class="button secondary" href="{{ url_for('management.index') }}">Manage departments, categories &amp; users</a>
+    {% endif %}
   </div>
   {% set complaint_items = complaints.items if complaints.items is defined else complaints %}
+  {% if g.user.role == 'admin' %}
+    {% set metrics = namespace(open=0, resolved=0, rejected=0, duration_seconds=0, duration_count=0) %}
+    {% for complaint in complaint_items %}
+      {% if complaint.status in ('Submitted', 'In Progress') %}{% set metrics.open = metrics.open + 1 %}{% endif %}
+      {% if complaint.status == 'Resolved' %}
+        {% set metrics.resolved = metrics.resolved + 1 %}
+        {% if complaint.resolved_at %}
+          {% set metrics.duration_seconds = metrics.duration_seconds + (complaint.resolved_at - complaint.created_at).total_seconds() %}
+          {% set metrics.duration_count = metrics.duration_count + 1 %}
+        {% endif %}
+      {% endif %}
+      {% if complaint.status == 'Rejected' %}{% set metrics.rejected = metrics.rejected + 1 %}{% endif %}
+    {% endfor %}
+    <section class="admin-overview" aria-labelledby="overview-heading">
+      <div class="dashboard-list-heading">
+        <div>
+          <p class="eyebrow">Live complaint data</p>
+          <h2 id="overview-heading">Overview</h2>
+        </div>
+        <span class="result-count">{{ complaints.total if complaints.total is defined else complaint_items|length }} matching complaints</span>
+      </div>
+      <p class="form-hint">The total reflects all server-matched results. Status, category, department, and resolution-time breakdowns below reflect the currently loaded page{% if complaints.pages is defined and complaints.pages > 1 %} ({{ complaint_items|length }} records){% endif %}.</p>
+      <div class="dashboard-stats">
+        <article class="stat-card">
+          <span class="stat-label">Total complaints</span>
+          <strong class="stat-value">{{ complaints.total if complaints.total is defined else complaint_items|length }}</strong>
+          <span class="stat-note">Matching current server filters</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Open on this page</span>
+          <strong class="stat-value">{{ metrics.open }}</strong>
+          <span class="stat-note">Submitted or in progress</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Resolved on this page</span>
+          <strong class="stat-value">{{ metrics.resolved }}</strong>
+          <span class="stat-note">From loaded records</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Rejected on this page</span>
+          <strong class="stat-value">{{ metrics.rejected }}</strong>
+          <span class="stat-note">From loaded records</span>
+        </article>
+      </div>
+      {% if complaint_items %}
+        {% set chart = namespace(submitted=0, in_progress=0, resolved=0, rejected=0, cancelled=0) %}
+        {% for complaint in complaint_items %}
+          {% if complaint.status == 'Submitted' %}{% set chart.submitted = chart.submitted + 1 %}{% endif %}
+          {% if complaint.status == 'In Progress' %}{% set chart.in_progress = chart.in_progress + 1 %}{% endif %}
+          {% if complaint.status == 'Resolved' %}{% set chart.resolved = chart.resolved + 1 %}{% endif %}
+          {% if complaint.status == 'Rejected' %}{% set chart.rejected = chart.rejected + 1 %}{% endif %}
+          {% if complaint.status == 'Cancelled' %}{% set chart.cancelled = chart.cancelled + 1 %}{% endif %}
+        {% endfor %}
+        <div class="admin-analytics-grid">
+          <section class="card admin-chart" aria-labelledby="status-chart-heading">
+            <div class="card-heading"><h3 id="status-chart-heading">Status distribution</h3></div>
+            {% for status, count, class_name in (
+              ('Submitted', chart.submitted, 'submitted'),
+              ('In Progress', chart.in_progress, 'in-progress'),
+              ('Resolved', chart.resolved, 'resolved'),
+              ('Rejected', chart.rejected, 'rejected'),
+              ('Cancelled', chart.cancelled, 'cancelled')
+            ) %}
+              <div class="chart-row">
+                <div class="chart-label"><span>{{ status }}</span><strong>{{ count }}</strong></div>
+                <div class="chart-track" role="img" aria-label="{{ count }} {{ status }} complaints out of {{ complaint_items|length }}">
+                  <span class="chart-bar status-{{ class_name }}" style="width: {{ (count / complaint_items|length * 100)|round(1) }}%"></span>
+                </div>
+              </div>
+            {% endfor %}
+          </section>
+          <section class="card admin-chart" aria-labelledby="resolution-metrics-heading">
+            <div class="card-heading"><h3 id="resolution-metrics-heading">Resolution time</h3></div>
+            <strong class="stat-value">
+              {% if metrics.duration_count %}
+                {{ (metrics.duration_seconds / metrics.duration_count / 3600)|round(1) }} hrs
+              {% else %}
+                —
+              {% endif %}
+            </strong>
+            <p class="stat-note">Average from resolved records with a recorded resolution timestamp on this page.</p>
+            <p class="form-hint">{{ metrics.duration_count }} timed resolution{{ '' if metrics.duration_count == 1 else 's' }}</p>
+          </section>
+          <section class="card admin-chart" aria-labelledby="category-distribution-heading">
+            <div class="card-heading"><h3 id="category-distribution-heading">Category distribution</h3></div>
+            {% for group in complaint_items|groupby('category.name') %}
+              <div class="chart-row">
+                <div class="chart-label"><span>{{ group.grouper }}</span><strong>{{ group.list|length }}</strong></div>
+                <div class="chart-track" role="img" aria-label="{{ group.list|length }} complaints in category {{ group.grouper }}">
+                  <span class="chart-bar chart-bar-category" style="width: {{ (group.list|length / complaint_items|length * 100)|round(1) }}%"></span>
+                </div>
+              </div>
+            {% endfor %}
+          </section>
+          <section class="card admin-chart" aria-labelledby="department-distribution-heading">
+            <div class="card-heading"><h3 id="department-distribution-heading">Department distribution</h3></div>
+            {% for group in complaint_items|groupby('department.name', default='Unassigned') %}
+              <div class="chart-row">
+                <div class="chart-label"><span>{{ group.grouper }}</span><strong>{{ group.list|length }}</strong></div>
+                <div class="chart-track" role="img" aria-label="{{ group.list|length }} complaints for department {{ group.grouper }}">
+                  <span class="chart-bar chart-bar-department" style="width: {{ (group.list|length / complaint_items|length * 100)|round(1) }}%"></span>
+                </div>
+              </div>
+            {% endfor %}
+          </section>
+        </div>
+      {% else %}
+        <section class="empty-state" aria-labelledby="admin-empty-heading">
+          <h3 id="admin-empty-heading">No complaints in these results</h3>
+          <p>Overview charts and resolution metrics will appear when matching server records are available.</p>
+        </section>
+      {% endif %}
+    </section>
+  {% endif %}
   {% if complaint_items %}
-    <div class="dashboard-filters" data-dashboard-filters>
+    <form class="dashboard-filters" method="get" action="{{ url_for('complaints.list_complaints') }}" data-dashboard-filters>
       <div class="form-field dashboard-search">
         <label for="complaint-search">Search complaints</label>
         <input id="complaint-search" type="search" placeholder="Search ticket, title, category, or department" autocomplete="off" disabled data-complaint-search>
       </div>
       <div class="form-field dashboard-status-filter">
         <label for="complaint-status">Filter by status</label>
-        <select id="complaint-status" disabled data-complaint-status>
+        <select id="complaint-status" name="status" data-complaint-status>
           <option value="">All statuses</option>
-          <option value="submitted">Submitted</option>
-          <option value="in progress">In Progress</option>
-          <option value="resolved">Resolved</option>
-          <option value="rejected">Rejected</option>
+          {% for status in ('Submitted', 'In Progress', 'Resolved', 'Rejected', 'Cancelled') %}
+            <option value="{{ status }}" {% if request.args.get('status') == status %}selected{% endif %}>{{ status }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="form-field">
         <label for="complaint-priority">Filter by priority</label>
         <select id="complaint-priority" disabled data-complaint-priority>
           <option value="">All priorities</option>
-          {% for priority in complaints|map(attribute='priority')|unique|sort %}
+          {% for priority in complaint_items|map(attribute='priority')|unique|sort %}
             <option value="{{ priority|lower }}">{{ priority }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="form-field">
         <label for="complaint-category">Filter by category</label>
-        <select id="complaint-category" disabled data-complaint-category>
+        <select id="complaint-category" name="category_id" data-complaint-category>
           <option value="">All categories</option>
-          {% for category in complaints|map(attribute='category.name')|unique|sort %}
-            <option value="{{ category|lower }}">{{ category }}</option>
+          {% for category in complaint_items|map(attribute='category')|unique(attribute='id')|sort(attribute='name') %}
+            <option value="{{ category.id }}" {% if request.args.get('category_id')|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
           {% endfor %}
         </select>
       </div>
-    </div>
-    {% if g.user.role == 'officer' %}
-      <p class="form-hint">The server limits this queue to complaints in your assigned department. Search and filters apply only to the records returned by the server.</p>
+      <div class="form-field">
+        <label for="complaint-date-from">Submitted from</label>
+        <input id="complaint-date-from" name="date_from" type="date" value="{{ request.args.get('date_from', '') }}">
+      </div>
+      <div class="form-field">
+        <label for="complaint-date-to">Submitted through</label>
+        <input id="complaint-date-to" name="date_to" type="date" value="{{ request.args.get('date_to', '') }}">
+      </div>
+      <div class="form-field">
+        <label for="complaint-page-size">Rows per page</label>
+        <select id="complaint-page-size" name="per_page">
+          {% for size in (20, 50, 100) %}
+            <option value="{{ size }}" {% if request.args.get('per_page', '20')|int == size %}selected{% endif %}>{{ size }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="actions">
+        <button type="submit">Apply server filters</button>
+        <a class="button secondary" href="{{ url_for('complaints.list_complaints') }}">Clear filters</a>
+      </div>
+    </form>
+    {% if g.user.role in ('officer', 'admin') %}
+      <p class="form-hint">{% if g.user.role == 'officer' %}The server limits this queue to complaints in your assigned department. {% endif %}Status, category, and date filters are applied by the server. Search and priority filters only inspect the loaded page because no server-side search or priority filter is available.</p>
     {% endif %}
     <p class="form-hint filter-hint" data-filter-status aria-live="polite">{{ complaints.total if complaints.total is defined else complaint_items|length }} complaints</p>
     <div class="table-wrap">
@@ -58,6 +194,7 @@
             <th scope="col">Category</th>
             <th scope="col">Department</th>
             <th scope="col">Submission Date</th>
+            {% if g.user.role == 'admin' %}<th scope="col">Assignment</th>{% endif %}
             <th scope="col">Status</th>
             <th scope="col">Action</th>
           </tr>
@@ -68,13 +205,14 @@
               data-complaint-item
               data-status="{{ complaint.status|lower }}"
               data-priority="{{ complaint.priority|lower }}"
-              data-category="{{ complaint.category.name|lower }}"
+              data-category="{{ complaint.category_id }}"
               data-search="{{ complaint.ticket_id }} {{ complaint.title }} {{ complaint.category.name }} {{ complaint.department.name if complaint.department else 'Unassigned' }}">
               <td><a class="ticket-link" href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.ticket_id }}</a></td>
               <td>{{ complaint.title }}</td>
               <td>{{ complaint.category.name }}</td>
               <td>{{ complaint.department.name if complaint.department else 'Unassigned' }}</td>
               <td><time datetime="{{ complaint.created_at.isoformat() }}">{{ complaint.created_at.strftime('%Y-%m-%d') }}</time></td>
+              {% if g.user.role == 'admin' %}<td>{{ 'Assigned' if complaint.assigned_to else 'Unassigned' }}</td>{% endif %}
               <td><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></td>
               <td><a href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}" aria-label="View complaint {{ complaint.ticket_id }}">View details</a></td>
             </tr>
@@ -85,16 +223,19 @@
     <p class="empty-state filter-empty" hidden data-filter-empty>No complaints match your search or status filter.</p>
     {% if complaints.pages is defined and complaints.pages > 1 %}
       <nav aria-label="Complaint pages">
-        {% if complaints.has_prev %}<a href="{{ url_for('complaints.list_complaints', page=complaints.prev_num) }}">Previous</a>{% endif %}
+        {% if complaints.has_prev %}<a href="{{ url_for('complaints.list_complaints', page=complaints.prev_num, per_page=request.args.get('per_page', 20), status=request.args.get('status'), category_id=request.args.get('category_id'), date_from=request.args.get('date_from'), date_to=request.args.get('date_to')) }}">Previous</a>{% endif %}
         <span>Page {{ complaints.page }} of {{ complaints.pages }}</span>
-        {% if complaints.has_next %}<a href="{{ url_for('complaints.list_complaints', page=complaints.next_num) }}">Next</a>{% endif %}
+        {% if complaints.has_next %}<a href="{{ url_for('complaints.list_complaints', page=complaints.next_num, per_page=request.args.get('per_page', 20), status=request.args.get('status'), category_id=request.args.get('category_id'), date_from=request.args.get('date_from'), date_to=request.args.get('date_to')) }}">Next</a>{% endif %}
       </nav>
     {% endif %}
   {% else %}
     <section class="empty-state" aria-labelledby="empty-complaints-title">
       <span class="empty-state-icon" aria-hidden="true">+</span>
-      <h2 id="empty-complaints-title">No complaints to show</h2>
-      <p>Complaints you are authorized to access will appear here.</p>
+      <h2 id="empty-complaints-title">{{ 'No complaints match these filters' if request.args else 'No complaints to show' }}</h2>
+      <p>{{ 'Try adjusting the filters or clear them to see all complaints.' if request.args else 'Complaints you are authorized to access will appear here.' }}</p>
+      {% if request.args %}
+        <a class="button secondary" href="{{ url_for('complaints.list_complaints') }}">Clear filters</a>
+      {% endif %}
       {% if g.user.role in ('student', 'staff') %}
         <a class="button" href="{{ url_for('complaints.create_complaint') }}">Submit a complaint</a>
       {% endif %}

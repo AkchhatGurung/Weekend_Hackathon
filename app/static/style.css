@@ -220,6 +220,23 @@ p { color: var(--color-muted); }
 .complaint-meta dd { margin: .1rem 0 0; color: #304652; font-size: .87rem; }
 .dashboard-empty-state { margin-top: .5rem; }
 .filter-empty { margin-top: .75rem; }
+.admin-overview { margin-bottom: 2rem; }
+.admin-overview > .form-hint { margin-bottom: 1rem; }
+.admin-analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.admin-chart { min-width: 0; margin: 0; }
+.admin-chart h3 { margin: 0; font-size: 1rem; }
+.admin-chart .stat-value { display: block; margin: .5rem 0; }
+.chart-row { display: grid; gap: .4rem; margin-top: .9rem; }
+.chart-label { display: flex; justify-content: space-between; gap: .75rem; color: #405661; font-size: .86rem; }
+.chart-label span { overflow-wrap: anywhere; }
+.chart-track { height: .65rem; overflow: hidden; border-radius: 999px; background: #edf1f3; }
+.chart-bar { height: 100%; display: block; border-radius: inherit; background: #7893a1; }
+.chart-bar.status-in-progress { background: #4384b2; }
+.chart-bar.status-resolved { background: #4c9a70; }
+.chart-bar.status-rejected { background: #c46d6d; }
+.chart-bar.chart-bar-category { background: #258c88; }
+.chart-bar.chart-bar-department { background: #7783b8; }
+.dashboard-filters .actions { align-items: end; }
 
 .card {
   margin-block: 1rem;
@@ -416,6 +433,7 @@ td:first-child, th:first-child { padding-left: 1.1rem; }
   .page-heading { align-items: flex-start; flex-direction: column; }
   .page-heading > .button { width: 100%; }
   .dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+  .admin-analytics-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (min-width: 600px) {
@@ -434,6 +452,7 @@ td:first-child, th:first-child { padding-left: 1.1rem; }
   .details dd { margin-bottom: .7rem; }
   .dashboard-list-heading { align-items: flex-start; flex-direction: column; gap: .35rem; }
   .dashboard-filters { grid-template-columns: minmax(0, 1fr); padding: .8rem; }
+  .dashboard-filters .actions { align-items: stretch; flex-direction: column; }
   .complaint-card article { padding: .9rem; }
   .complaint-title-row { align-items: flex-start; flex-direction: column; gap: .55rem; }
   .complaint-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }

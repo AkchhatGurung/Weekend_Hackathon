@@ -64,7 +64,7 @@
     const items = Array.from(list.querySelectorAll("[data-complaint-item]"));
     const updateComplaints = () => {
       const query = searchInput.value.trim().toLocaleLowerCase();
-      const status = statusSelect.value;
+      const status = statusSelect.value.toLocaleLowerCase();
       const priority = prioritySelect?.value ?? "";
       const category = categorySelect?.value ?? "";
       let visibleCount = 0;

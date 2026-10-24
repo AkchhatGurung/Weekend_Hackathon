@@ -39,7 +39,7 @@
         </span>
         <a
           href="{{ url_for('complaints.list_complaints') }}"
-          {% if request.endpoint == 'complaints.list_complaints' %}aria-current="page"{% endif %}>{{ 'Dashboard' if g.user.role == 'student' else 'Complaints' }}</a>
+          {% if request.endpoint == 'complaints.list_complaints' %}aria-current="page"          {% endif %}>{{ 'Dashboard' if g.user.role in ('student', 'admin') else 'Complaints' }}</a>
         {% if g.user.role == 'student' or g.user.role == 'staff' %}
           <a
             href="{{ url_for('complaints.create_complaint') }}"

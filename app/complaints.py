@@ -22,13 +22,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.auth import login_required
+from app.auth import login_required, officer_required
 from app.models import Category, Complaint, Department
 from app.services.data import create_complaint as create_complaint_record
 from app.services.data import cancel_complaint as cancel_complaint_record
 from app.services.data import get_complaint_by_ticket
 from app.services.data import can_access_complaint
 from app.services.data import list_complaints as list_complaints_record
+from app.services.data import update_complaint_status as update_complaint_status_record
 from app.services.data import update_complaint as update_complaint_record
 
 complaints_bp = Blueprint("complaints", __name__, url_prefix="/complaints")
@@ -187,6 +188,32 @@ def create_complaint():
 def view_complaint(complaint_id):
     complaint = _visible_complaint(complaint_id)
     return render_template("complaints/detail.html", complaint=complaint)
+
+
+@complaints_bp.post("/<int:complaint_id>/status")
+@officer_required
+def update_complaint_status(complaint_id):
+    complaint = _visible_complaint(complaint_id)
+    try:
+        update_complaint_status_record(
+            complaint=complaint,
+            actor=g.user,
+            status=request.form.get("status", ""),
+            remarks=request.form.get("remarks", ""),
+            resolution_notes=request.form.get("resolution_notes", ""),
+            rejection_reason=request.form.get("rejection_reason", ""),
+        )
+        db.session.commit()
+    except ValueError as error:
+        db.session.rollback()
+        flash(str(error), "error")
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not update status for complaint %s.", complaint.id)
+        flash("The complaint status could not be updated. Please try again.", "error")
+    else:
+        flash(f"Complaint status updated to {complaint.status}.", "success")
+    return redirect(url_for("complaints.view_complaint", complaint_id=complaint.id))
 
 
 @complaints_bp.get("/ticket/<ticket_id>")

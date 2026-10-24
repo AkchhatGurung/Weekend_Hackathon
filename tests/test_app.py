@@ -1,4 +1,5 @@
 from io import BytesIO
+import re
 import tempfile
 import unittest
 
@@ -12,6 +13,7 @@ from app.services.data import (
     create_complaint,
     deactivate_record,
     list_complaints,
+    update_complaint_status,
 )
 
 
@@ -338,6 +340,147 @@ class CampusAppTests(unittest.TestCase):
             self.assertEqual(complaint.status, "Cancelled")
             self.assertEqual(ComplaintHistory.query.count(), 2)
             self.assertEqual(ComplaintHistory.query.order_by(ComplaintHistory.id).all()[-1].action, "Cancelled")
+
+    def test_admin_can_resolve_complaint_with_notes_and_history(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        self.client.post("/logout")
+        self.login("admin@example.edu")
+
+        detail = self.client.get("/complaints/1")
+        self.assertEqual(detail.status_code, 200)
+        self.assertIn(b'action="/complaints/1/status"', detail.data)
+        self.assertIn(b'name="csrf_token"', detail.data)
+
+        invalid = self.client.post(
+            "/complaints/1/status",
+            data={"status": "Resolved", "resolution_notes": "   "},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Resolution notes is required.", invalid.data)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.status, "Submitted")
+            self.assertEqual(len(complaint.history), 1)
+
+        self.app.config["WTF_CSRF_ENABLED"] = True
+        csrf_detail = self.client.get("/complaints/1")
+        csrf_match = re.search(
+            rb'name="csrf_token" value="([^"]+)"', csrf_detail.data
+        )
+        self.assertIsNotNone(csrf_match)
+        csrf_rejected = self.client.post(
+            "/complaints/1/status",
+            data={
+                "status": "Resolved",
+                "resolution_notes": "Replaced the damaged light.",
+            },
+        )
+        self.assertEqual(csrf_rejected.status_code, 400)
+
+        response = self.client.post(
+            "/complaints/1/status",
+            data={
+                "csrf_token": csrf_match.group(1).decode(),
+                "status": "Resolved",
+                "remarks": "Work completed.",
+                "resolution_notes": "Replaced the damaged light.",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Complaint status updated to Resolved.", response.data)
+        self.assertIn(b"Replaced the damaged light.", response.data)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.status, "Resolved")
+            self.assertIsNotNone(complaint.resolved_at)
+            history = ComplaintHistory.query.order_by(ComplaintHistory.id).all()[-1]
+            self.assertEqual(history.old_status, "Submitted")
+            self.assertEqual(history.new_status, "Resolved")
+            self.assertEqual(history.remarks, "Work completed.")
+
+    def test_rejection_requires_reason_and_terminal_status_cannot_be_changed(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        self.client.post("/logout")
+        self.login("admin@example.edu")
+
+        invalid = self.client.post(
+            "/complaints/1/status",
+            data={"status": "Rejected"},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Rejection reason is required.", invalid.data)
+        response = self.client.post(
+            "/complaints/1/status",
+            data={
+                "status": "Rejected",
+                "rejection_reason": "This request is outside campus scope.",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn(b"Complaint status updated to Rejected.", response.data)
+        self.assertIn(b"This request is outside campus scope.", response.data)
+
+        invalid_transition = self.client.post(
+            "/complaints/1/status",
+            data={"status": "In Progress"},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Only open complaints can be updated.", invalid_transition.data)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.status, "Rejected")
+            self.assertEqual(
+                complaint.rejection_reason, "This request is outside campus scope."
+            )
+            self.assertEqual(len(complaint.history), 2)
+
+    def test_status_update_is_role_and_department_authorized_on_server(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        response = self.client.post(
+            "/complaints/1/status", data={"status": "In Progress"}
+        )
+        self.assertEqual(response.status_code, 403)
+
+        self.client.post("/logout")
+        self.login("officer@example.edu")
+        self.assertEqual(
+            self.client.post(
+                "/complaints/1/status", data={"status": "In Progress"}
+            ).status_code,
+            302,
+        )
+
+        self.client.post("/logout")
+        self.login("unassigned-officer@example.edu")
+        self.assertEqual(
+            self.client.post(
+                "/complaints/1/status", data={"status": "Resolved"}
+            ).status_code,
+            404,
+        )
+        with self.app.app_context():
+            self.assertEqual(db.session.get(Complaint, 1).status, "In Progress")
+
+    def test_status_service_rejects_nonprivileged_actor(self):
+        with self.app.app_context():
+            student = db.session.get(User, self.student_id)
+            category = db.session.get(Category, self.category_id)
+            complaint = create_complaint(
+                reporter=student,
+                category=category,
+                title="Broken light",
+                description="The light is not working.",
+                location="Block A",
+            )
+            db.session.flush()
+            with self.assertRaisesRegex(ValueError, "not allowed"):
+                update_complaint_status(
+                    complaint, student, "In Progress"
+                )
 
     def test_ticket_lookup_and_object_authorization(self):
         self.login("student@example.edu")
