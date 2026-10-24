@@ -3,40 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f8">
   <title>{% block title %}Smart Campus Grievances{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header">
-    <a class="brand" href="{{ url_for('complaints.list_complaints') if g.user else url_for('auth.login') }}">Smart Campus Grievances</a>
-    <nav>
+    <div class="header-inner">
+      <a class="brand" href="{{ url_for('complaints.list_complaints') if g.user else url_for('auth.login') }}">
+        <span class="brand-mark" aria-hidden="true">SC</span>
+        <span class="brand-copy">
+          <span class="brand-name">Smart Campus</span>
+          <span class="brand-subtitle">Complaints &amp; Grievances</span>
+        </span>
+      </a>
+      <button
+        class="nav-toggle"
+        type="button"
+        aria-controls="primary-navigation"
+        aria-expanded="false"
+        aria-label="Open navigation"
+        data-nav-toggle
+        hidden>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+      <nav class="site-nav" id="primary-navigation" aria-label="Main navigation" data-collapsible-nav>
       {% if g.user %}
-        <span>{{ g.user.name }} · {{ g.user.role|title }}</span>
-        <a href="{{ url_for('complaints.list_complaints') }}">Complaints</a>
+        <span class="nav-user">
+          <span class="nav-user-name">{{ g.user.name }}</span>
+          <span class="nav-user-role">{{ g.user.role|title }}</span>
+        </span>
+        <a
+          href="{{ url_for('complaints.list_complaints') }}"
+          {% if request.endpoint == 'complaints.list_complaints' %}aria-current="page"{% endif %}>Complaints</a>
         {% if g.user.role == 'student' or g.user.role == 'staff' %}
-          <a href="{{ url_for('complaints.create_complaint') }}">New complaint</a>
+          <a
+            href="{{ url_for('complaints.create_complaint') }}"
+            {% if request.endpoint in ('complaints.create_complaint', 'complaints.edit_complaint') %}aria-current="page"{% endif %}>New complaint</a>
         {% endif %}
-        {% if g.user.role == 'admin' %}<a href="{{ url_for('management.index') }}">Administration</a>{% endif %}
-        <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
+        {% if g.user.role == 'admin' %}
+          <a href="{{ url_for('management.index') }}" {% if request.endpoint == 'management.index' %}aria-current="page"{% endif %}>Administration</a>
+        {% endif %}
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form" data-loading-form>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="link-button">Sign out</button>
+          <button type="submit" class="nav-sign-out" data-loading-text="Signing out…">Sign out</button>
         </form>
       {% else %}
-        <a href="{{ url_for('auth.login') }}">Sign in</a>
+        <a href="{{ url_for('auth.login') }}" aria-current="page">Sign in</a>
       {% endif %}
-    </nav>
+      </nav>
+    </div>
   </header>
-  <main class="container">
+  <main class="container" id="main-content" tabindex="-1">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <ul class="flash-list">
+        <div class="flash-stack" aria-label="Notifications">
           {% for category, message in messages %}
-            <li class="{{ category }}">{{ message }}</li>
+            <div
+              class="alert {% if category == 'error' %}alert-error{% elif category == 'success' %}alert-success{% else %}alert-info{% endif %}"
+              role="{% if category == 'error' %}alert{% else %}status{% endif %}"
+              data-dismissible-alert>
+              <span>{{ message }}</span>
+              <button class="alert-dismiss" type="button" aria-label="Dismiss notification" data-dismiss-alert>&times;</button>
+            </div>
           {% endfor %}
-        </ul>
+        </div>
       {% endif %}
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>Smart Campus Grievance Management</p>
+      <p>Making campus better, one report at a time.</p>
+    </div>
+  </footer>
 </body>
 </html>

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Request error · Smart Campus Grievances{% endblock %}
 {% block content %}
-  <section class="card">
+  <section class="empty-state" role="alert">
+    <span class="empty-state-icon" aria-hidden="true">!</span>
+    <p class="eyebrow">Something went wrong</p>
     <h1>Request could not be completed</h1>
     <p>{{ message }}</p>
     <a href="{{ url_for('complaints.list_complaints') }}">Return to complaints</a>
