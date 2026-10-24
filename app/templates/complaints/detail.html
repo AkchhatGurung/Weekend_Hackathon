@@ -3,7 +3,7 @@
 {% block content %}
   <div class="page-heading">
     <div class="page-intro">
-      <p class="eyebrow">{{ complaint.ticket_id }}</p>
+      <p class="eyebrow">Ticket {{ complaint.ticket_id }}</p>
       <h1>{{ complaint.title }}</h1>
       <p><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></p>
     </div>
@@ -11,36 +11,53 @@
       <a class="button secondary" href="{{ url_for('complaints.edit_complaint', complaint_id=complaint.id) }}">Edit complaint</a>
     {% endif %}
   </div>
-  <section class="card">
-    <div class="card-heading"><h2>Complaint details</h2></div>
+
+  <section class="card" aria-labelledby="complaint-details-heading">
+    <div class="card-heading"><h2 id="complaint-details-heading">Complaint details</h2></div>
     <dl class="details">
+      <dt>Ticket ID</dt><dd>{{ complaint.ticket_id }}</dd>
       <dt>Category</dt><dd>{{ complaint.category.name }}</dd>
       <dt>Department</dt><dd>{{ complaint.department.name if complaint.department else 'Unassigned' }}</dd>
-      <dt>Reporter</dt><dd>{{ complaint.reporter.name }}</dd>
-      <dt>Location</dt><dd>{{ complaint.location }}</dd>
-      <dt>Priority</dt><dd>{{ complaint.priority }}</dd>
+      <dt>Current status</dt><dd><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></dd>
+      <dt>Submission date</dt><dd><time datetime="{{ complaint.created_at.isoformat() }}">{{ complaint.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</time></dd>
       <dt>Description</dt><dd class="preserve-lines">{{ complaint.description }}</dd>
-      <dt>Submitted</dt><dd>{{ complaint.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</dd>
+      {% if complaint.status == 'Resolved' and complaint.resolution_notes %}
+        <dt>Resolution notes</dt><dd class="preserve-lines">{{ complaint.resolution_notes }}</dd>
+      {% endif %}
+      {% if complaint.status == 'Rejected' and complaint.rejection_reason %}
+        <dt>Rejection reason</dt><dd class="preserve-lines">{{ complaint.rejection_reason }}</dd>
+      {% endif %}
       {% if complaint.image_key %}
-        <dt>Image</dt><dd><a href="{{ url_for('complaints.complaint_image', complaint_id=complaint.id) }}">View uploaded image</a></dd>
+        <dt>Image attachment</dt>
+        <dd>
+          <a href="{{ url_for('complaints.complaint_image', complaint_id=complaint.id) }}">Open uploaded image</a>
+          <p class="form-hint">If the image is no longer available, the attachment link may return a not-found response.</p>
+          <img
+            src="{{ url_for('complaints.complaint_image', complaint_id=complaint.id) }}"
+            alt="Image attached to complaint {{ complaint.ticket_id }}"
+            loading="lazy"
+            style="max-height: 24rem; object-fit: contain;">
+        </dd>
       {% endif %}
     </dl>
   </section>
-  <section class="card">
-    <div class="card-heading"><h2>History</h2></div>
+
+  <section class="card" aria-labelledby="history-heading">
+    <div class="card-heading"><h2 id="history-heading">Status history</h2></div>
     {% if complaint.history %}
       <ol class="history">
-        {% for entry in complaint.history %}
+        {% for entry in complaint.history|sort(attribute='created_at') %}
           <li>
             <strong>{{ entry.action }}</strong>
             {% if entry.new_status %}<span> — {{ entry.new_status }}</span>{% endif %}
-            <p>{{ entry.remarks or '' }} · {{ entry.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+            {% if entry.remarks %}<p class="preserve-lines">{{ entry.remarks }}</p>{% endif %}
+            <p><time datetime="{{ entry.created_at.isoformat() }}">{{ entry.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</time></p>
           </li>
         {% endfor %}
       </ol>
     {% else %}
       <div class="empty-state">
-        <p>No history has been recorded yet.</p>
+        <p>No status history has been recorded yet.</p>
       </div>
     {% endif %}
   </section>

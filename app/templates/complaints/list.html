@@ -1,41 +1,72 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Student dashboard' if g.user.role == 'student' else 'Complaints' }} · Smart Campus Grievances{% endblock %}
 {% block content %}
-  {% if g.user.role == 'student' %}
-    {% include "student_dashboard.html" %}
-  {% else %}
-    <div class="page-heading">
-      <div class="page-intro">
-        <p class="eyebrow">Campus support</p>
-        <h1>Complaints</h1>
-        <p>Track campus concerns and their current status.</p>
+  <div class="page-heading">
+    <div class="page-intro">
+      <p class="eyebrow">{{ 'Student portal' if g.user.role == 'student' else 'Campus support' }}</p>
+      <h1>{{ 'Welcome, ' ~ g.user.name if g.user.role == 'student' else ('Your complaints' if g.user.role == 'staff' else 'Complaints') }}</h1>
+      <p>{{ 'Review your campus concerns and keep track of what happens next.' if g.user.role == 'student' else 'Track campus concerns and their current status.' }}</p>
+    </div>
+  </div>
+  {% if complaints %}
+    <div class="dashboard-filters" data-dashboard-filters>
+      <div class="form-field dashboard-search">
+        <label for="complaint-search">Search complaints</label>
+        <input id="complaint-search" type="search" placeholder="Search ticket, title, category, or department" autocomplete="off" disabled data-complaint-search>
+      </div>
+      <div class="form-field dashboard-status-filter">
+        <label for="complaint-status">Filter by status</label>
+        <select id="complaint-status" disabled data-complaint-status>
+          <option value="">All statuses</option>
+          <option value="submitted">Submitted</option>
+          <option value="in progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="rejected">Rejected</option>
+        </select>
       </div>
     </div>
-    {% if complaints %}
-      <div class="table-wrap">
-        <table>
-          <caption class="visually-hidden">Complaints visible to your account</caption>
-          <thead><tr><th scope="col">Ticket</th><th scope="col">Title</th><th scope="col">Category</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col">Submitted</th></tr></thead>
-          <tbody>
-            {% for complaint in complaints %}
-              <tr>
-                <td><a class="ticket-link" href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.ticket_id }}</a></td>
-                <td>{{ complaint.title }}</td>
-                <td>{{ complaint.category.name }}</td>
-                <td>{{ complaint.department.name if complaint.department else 'Unassigned' }}</td>
-                <td><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></td>
-                <td>{{ complaint.created_at.strftime('%Y-%m-%d') }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <section class="empty-state" aria-labelledby="empty-complaints-title">
-        <span class="empty-state-icon" aria-hidden="true">+</span>
-        <h2 id="empty-complaints-title">Nothing to review yet</h2>
-        <p>When complaints are submitted or assigned to you, they will appear here.</p>
-      </section>
-    {% endif %}
+    <p class="form-hint filter-hint" data-filter-status aria-live="polite">{{ complaints|length }} complaints</p>
+    <div class="table-wrap">
+      <table>
+        <caption class="visually-hidden">Complaints visible to your account</caption>
+        <thead>
+          <tr>
+            <th scope="col">Ticket ID</th>
+            <th scope="col">Complaint Title</th>
+            <th scope="col">Category</th>
+            <th scope="col">Department</th>
+            <th scope="col">Submission Date</th>
+            <th scope="col">Status</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody data-complaint-list>
+          {% for complaint in complaints %}
+            <tr
+              data-complaint-item
+              data-status="{{ complaint.status|lower }}"
+              data-search="{{ complaint.ticket_id }} {{ complaint.title }} {{ complaint.category.name }} {{ complaint.department.name if complaint.department else 'Unassigned' }}">
+              <td><a class="ticket-link" href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.ticket_id }}</a></td>
+              <td>{{ complaint.title }}</td>
+              <td>{{ complaint.category.name }}</td>
+              <td>{{ complaint.department.name if complaint.department else 'Unassigned' }}</td>
+              <td><time datetime="{{ complaint.created_at.isoformat() }}">{{ complaint.created_at.strftime('%Y-%m-%d') }}</time></td>
+              <td><span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span></td>
+              <td><a href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}" aria-label="View complaint {{ complaint.ticket_id }}">View details</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="empty-state filter-empty" hidden data-filter-empty>No complaints match your search or status filter.</p>
+  {% else %}
+    <section class="empty-state" aria-labelledby="empty-complaints-title">
+      <span class="empty-state-icon" aria-hidden="true">+</span>
+      <h2 id="empty-complaints-title">No complaints to show</h2>
+      <p>Complaints you are authorized to access will appear here.</p>
+      {% if g.user.role in ('student', 'staff') %}
+        <a class="button" href="{{ url_for('complaints.create_complaint') }}">Submit a complaint</a>
+      {% endif %}
+    </section>
   {% endif %}
 {% endblock %}

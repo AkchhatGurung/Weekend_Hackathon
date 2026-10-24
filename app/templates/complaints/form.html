@@ -11,47 +11,111 @@
   <section class="card narrow">
     <form method="post" enctype="multipart/form-data" data-loading-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="location" value="{{ request.form.get('location', complaint.location if complaint else 'Not provided') }}">
       <div class="form-field">
-        <label for="title">Title</label>
-        <input id="title" name="title" maxlength="200" required value="{{ request.form.get('title', complaint.title if complaint else '') }}" autocomplete="off">
+        <label for="title">Complaint title</label>
+        <input id="title" name="title" maxlength="200" required value="{{ request.form.get('title', complaint.title if complaint else '') }}" autocomplete="off" aria-describedby="title-hint">
+        <span class="form-hint" id="title-hint">Summarize the issue in a few words.</span>
       </div>
       <div class="form-field">
         <label for="category_id">Category</label>
-        <select id="category_id" name="category_id" required>
+        <select id="category_id" name="category_id" required aria-describedby="category-hint">
           <option value="">Choose a category</option>
           {% for category in categories %}
-            <option value="{{ category.id }}" {% if request.form.get('category_id', complaint.category_id if complaint else '')|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+            <option
+              value="{{ category.id }}"
+              data-department="{{ category.default_department.name if category.default_department else 'Not assigned by category' }}"
+              {% if request.form.get('category_id', complaint.category_id if complaint else '')|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>
           {% endfor %}
         </select>
+        <span class="form-hint" id="category-hint">Categories are configured by the campus administrator.</span>
+      </div>
+      <div class="form-field">
+        <label for="department-display">Department assigned by admin</label>
+        <output id="department-display" aria-live="polite">
+          {% set selected_category_id = request.form.get('category_id', complaint.category_id if complaint else '')|string %}
+          {% set selected_category = categories|selectattr('id', 'equalto', selected_category_id|int)|first if selected_category_id else none %}
+          {{ selected_category.default_department.name if selected_category and selected_category.default_department else 'Assigned by the selected category' }}
+        </output>
+        <span class="form-hint">The administrator configures the department for each category. It is assigned automatically and cannot be changed here.</span>
       </div>
       <div class="form-field">
         <label for="description">Description</label>
-        <textarea id="description" name="description" maxlength="10000" required>{{ request.form.get('description', complaint.description if complaint else '') }}</textarea>
-        <span class="form-hint">Include details that will help the team understand and address the issue.</span>
+        <textarea id="description" name="description" maxlength="10000" required aria-describedby="description-hint">{{ request.form.get('description', complaint.description if complaint else '') }}</textarea>
+        <span class="form-hint" id="description-hint">Include details that will help the team understand and address the issue.</span>
       </div>
       <div class="form-field">
-        <label for="location">Location</label>
-        <input id="location" name="location" maxlength="200" required value="{{ request.form.get('location', complaint.location if complaint else '') }}" autocomplete="off">
-      </div>
-      <div class="form-field">
-        <label for="priority">Priority</label>
-        <select id="priority" name="priority">
-          {% for priority in ('Low', 'Normal', 'High', 'Urgent') %}
-            <option value="{{ priority }}" {% if request.form.get('priority', complaint.priority if complaint else 'Normal') == priority %}selected{% endif %}>{{ priority }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="form-field">
-        <label for="image">Image (JPEG, PNG or WebP; up to 5 MB)</label>
-        <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp">
+        <label for="image">Image attachment (optional)</label>
+        <input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="image-hint image-error">
+        <span class="form-hint" id="image-hint">JPEG, PNG, or WebP. Maximum file size: 5 MB.</span>
+        <p class="form-hint" id="image-error" role="alert" hidden></p>
+        <div id="image-preview-container" hidden>
+          <img id="image-preview" alt="Preview of the selected image" style="max-height: 18rem; object-fit: contain;">
+          <button id="remove-image" class="button secondary" type="button">Remove image</button>
+        </div>
       </div>
       {% if complaint and complaint.image_key %}
         <p>Current image: <a href="{{ url_for('complaints.complaint_image', complaint_id=complaint.id) }}">view image</a></p>
       {% endif %}
       <div class="actions">
-        <button type="submit" data-loading-text="Submitting…">{{ 'Save changes' if complaint else 'Submit complaint' }}</button>
+        <button type="submit" data-loading-text="{{ 'Saving…' if complaint else 'Submitting…' }}">{{ 'Save changes' if complaint else 'Submit complaint' }}</button>
         <a href="{{ url_for('complaints.list_complaints') }}">Cancel</a>
       </div>
     </form>
   </section>
+  <script>
+    (() => {
+      const category = document.getElementById("category_id");
+      const department = document.getElementById("department-display");
+      const imageInput = document.getElementById("image");
+      const previewContainer = document.getElementById("image-preview-container");
+      const preview = document.getElementById("image-preview");
+      const removeButton = document.getElementById("remove-image");
+      const imageError = document.getElementById("image-error");
+      const maxBytes = 5 * 1024 * 1024;
+      let previewUrl;
+
+      category.addEventListener("change", () => {
+        const selectedOption = category.selectedOptions[0];
+        department.textContent = selectedOption.value
+          ? selectedOption.dataset.department
+          : "Assigned by the selected category";
+      });
+
+      const clearPreview = () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = undefined;
+        imageInput.value = "";
+        imageInput.setCustomValidity("");
+        preview.removeAttribute("src");
+        previewContainer.hidden = true;
+        imageError.hidden = true;
+        imageError.textContent = "";
+      };
+
+      imageInput.addEventListener("change", () => {
+        clearPreview();
+        const file = imageInput.files[0];
+        if (!file) return;
+
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+        if (!allowedTypes.includes(file.type) || file.size > maxBytes) {
+          imageError.textContent = file.size > maxBytes
+            ? "The image must be 5 MB or smaller."
+            : "Choose a JPEG, PNG, or WebP image.";
+          imageError.hidden = false;
+          imageInput.setCustomValidity(imageError.textContent);
+          return;
+        }
+
+        imageInput.setCustomValidity("");
+        previewUrl = URL.createObjectURL(file);
+        preview.src = previewUrl;
+        previewContainer.hidden = false;
+      });
+
+      removeButton.addEventListener("click", clearPreview);
+      imageInput.addEventListener("input", () => imageInput.setCustomValidity(""));
+    })();
+  </script>
 {% endblock %}
