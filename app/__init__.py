@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash
 
 from config import Config
 from app.extensions import csrf, db, login_manager, migrate
+from app.constants import MIN_PASSWORD_LENGTH
 
 
 def create_app(test_config=None):
@@ -58,8 +59,10 @@ def create_app(test_config=None):
         """Create the first administrator account."""
         from app.models import User
 
-        if len(password) < 12:
-            raise click.ClickException("Passwords must be at least 12 characters long.")
+        if len(password) < MIN_PASSWORD_LENGTH:
+            raise click.ClickException(
+                f"Passwords must be at least {MIN_PASSWORD_LENGTH} characters long."
+            )
         normalized_email = email.strip().lower()
         if User.query.filter_by(email=normalized_email).first():
             raise click.ClickException("A user with that email already exists.")
@@ -72,5 +75,13 @@ def create_app(test_config=None):
         db.session.add(admin)
         db.session.commit()
         click.echo(f"Administrator account created for {normalized_email}.")
+
+    @app.cli.command("seed-data")
+    def seed_data():
+        """Seed the standard campus departments and categories."""
+        from scripts.seed import seed
+
+        seed()
+        click.echo("Campus departments and categories seeded.")
 
     return app

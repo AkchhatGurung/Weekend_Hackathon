@@ -21,8 +21,12 @@ class Department(db.Model):
         db.Boolean, nullable=False, default=True, server_default=db.true()
     )
 
-    categories = db.relationship("Category", back_populates="default_department")
-    complaints = db.relationship("Complaint", back_populates="department")
+    categories = db.relationship(
+        "Category", back_populates="default_department", passive_deletes=True
+    )
+    complaints = db.relationship(
+        "Complaint", back_populates="department", passive_deletes=True
+    )
 
 
 class User(UserMixin, db.Model):
@@ -46,9 +50,12 @@ class User(UserMixin, db.Model):
         server_default=db.func.now(),
     )
 
-    department = db.relationship("Department")
+    department = db.relationship("Department", passive_deletes=True)
     complaints = db.relationship(
-        "Complaint", foreign_keys="Complaint.reporter_id", back_populates="reporter"
+        "Complaint",
+        foreign_keys="Complaint.reporter_id",
+        back_populates="reporter",
+        passive_deletes=True,
     )
 
     __table_args__ = (
@@ -76,7 +83,9 @@ class Category(db.Model):
     default_department = db.relationship(
         "Department", back_populates="categories"
     )
-    complaints = db.relationship("Complaint", back_populates="category")
+    complaints = db.relationship(
+        "Complaint", back_populates="category", passive_deletes=True
+    )
 
 
 class Complaint(db.Model):
@@ -127,7 +136,10 @@ class Complaint(db.Model):
     category = db.relationship("Category", back_populates="complaints")
     department = db.relationship("Department", back_populates="complaints")
     history = db.relationship(
-        "ComplaintHistory", back_populates="complaint", order_by="ComplaintHistory.id"
+        "ComplaintHistory",
+        back_populates="complaint",
+        order_by="ComplaintHistory.id",
+        passive_deletes=True,
     )
 
     __table_args__ = (
@@ -144,10 +156,14 @@ class Complaint(db.Model):
             name="ck_complaints_rejection_reason",
         ),
         db.CheckConstraint(
-            "status <> 'Resolved' OR resolved_at IS NOT NULL",
-            name="ck_complaints_resolved_at",
+            "status <> 'Resolved' OR (resolved_at IS NOT NULL AND resolution_notes IS NOT NULL)",
+            name="ck_complaints_resolved_completion",
         ),
-        db.Index("idx_complaints_reporter_created", "reporter_id", "created_at"),
+        db.Index(
+            "idx_complaints_reporter_created",
+            "reporter_id",
+            db.text("created_at DESC"),
+        ),
         db.Index("idx_complaints_department_status", "department_id", "status"),
         db.Index("idx_complaints_assigned_to", "assigned_to"),
     )

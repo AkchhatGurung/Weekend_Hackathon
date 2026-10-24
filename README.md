@@ -31,6 +31,16 @@ python -m flask run
 
 Create an empty PostgreSQL database before applying the checked-in initial migration with `flask db upgrade`. Use `flask db migrate -m "Describe schema change"` for later model changes, review the generated revision, then apply it with `flask db upgrade`. Keep `SECRET_KEY`, database credentials, and production upload configuration in environment variables, not source control. Set `SESSION_COOKIE_SECURE=true` when serving over HTTPS. `UPLOAD_FOLDER` defaults to an `uploads` directory in the project root.
 
+Seed the standard campus departments and categories after migrations:
+
+```powershell
+python -m flask seed-data
+```
+
+Reusable data operations are in `app/services/data.py`. Complaint creation
+uses the database-generated primary-key sequence to derive ticket IDs, so
+concurrent submissions do not depend on row counts.
+
 The `smart_campus_grievance_schema.sql` file is the shared reference schema. For a new database, use the migrations generated from the Flask models rather than running both that starter SQL and migrations.
 
 ## Phase 1 routes
@@ -55,6 +65,9 @@ Run the focused test suite with:
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+For local testing, user passwords must be at least 3 characters long. Use a
+stronger password outside local testing.
 
 ## Frontend preview
 

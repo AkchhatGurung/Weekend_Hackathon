@@ -23,7 +23,9 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.auth import login_required
-from app.models import Category, Complaint, ComplaintHistory, Department
+from app.models import Category, Complaint, Department
+from app.services.data import create_complaint as create_complaint_record
+from app.services.data import update_complaint as update_complaint_record
 
 complaints_bp = Blueprint("complaints", __name__, url_prefix="/complaints")
 ALLOWED_IMAGE_FORMATS = {"JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp"}
@@ -110,27 +112,14 @@ def create_complaint():
             image_key = None
             try:
                 image_key = _save_upload(request.files.get("image"))
-                complaint = Complaint(
-                    reporter_id=g.user.id,
+                complaint = create_complaint_record(
+                    reporter=g.user,
                     category=category,
-                    department=category.default_department,
                     title=title,
                     description=description,
                     location=location,
                     priority=priority,
                     image_key=image_key,
-                )
-                db.session.add(complaint)
-                db.session.flush()
-                complaint.ticket_id = f"SCG-{complaint.id:08d}"
-                db.session.add(
-                    ComplaintHistory(
-                        complaint=complaint,
-                        actor_id=g.user.id,
-                        action="Submitted",
-                        new_status="Submitted",
-                        remarks="Complaint submitted.",
-                    )
                 )
                 db.session.commit()
             except ValueError as upload_error:
@@ -180,24 +169,19 @@ def edit_complaint(complaint_id):
                 upload = request.files.get("image")
                 if upload and upload.filename:
                     new_image_key = _save_upload(upload)
-                complaint.category = category
-                complaint.department = category.default_department
-                complaint.title = title
-                complaint.description = description
-                complaint.location = location
-                complaint.priority = priority
                 old_image_key = complaint.image_key
-                if new_image_key:
-                    complaint.image_key = new_image_key
-                db.session.add(
-                    ComplaintHistory(
-                        complaint=complaint,
-                        actor_id=g.user.id,
-                        action="Edited",
-                        old_status=complaint.status,
-                        new_status=complaint.status,
-                        remarks="Complaint details updated.",
-                    )
+                update_complaint_record(
+                    complaint,
+                    g.user,
+                    {
+                        "category": category,
+                        "title": title,
+                        "description": description,
+                        "location": location,
+                        "priority": priority,
+                        "image_key": new_image_key or complaint.image_key,
+                    },
+                    "Complaint details updated.",
                 )
                 db.session.commit()
             except ValueError as upload_error:

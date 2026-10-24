@@ -7,6 +7,11 @@ from werkzeug.security import generate_password_hash
 
 from app import create_app, db
 from app.models import Category, Complaint, ComplaintHistory, Department, User
+from app.services.data import (
+    create_complaint,
+    deactivate_record,
+    list_complaints,
+)
 
 
 class CampusAppTests(unittest.TestCase):
@@ -81,6 +86,31 @@ class CampusAppTests(unittest.TestCase):
         self.assertEqual(response.json, {"status": "ok"})
         self.assertNotIn(b"DATABASE_URL", response.data)
         self.assertNotIn(b"SECRET_KEY", response.data)
+
+    def test_complaint_service_generates_ticket_from_database_id_and_history(self):
+        with self.app.app_context():
+            student = db.session.get(User, self.student_id)
+            category = db.session.get(Category, self.category_id)
+            complaint = create_complaint(
+                reporter=student,
+                category=category,
+                title="Broken light",
+                description="The light is not working.",
+                location="Block A",
+            )
+            db.session.commit()
+
+            self.assertEqual(complaint.ticket_id, f"SCG-{complaint.id:08d}")
+            self.assertEqual(len(complaint.history), 1)
+            self.assertEqual(list_complaints(reporter_id=student.id), [complaint])
+
+    def test_supported_reference_records_are_deactivated_not_deleted(self):
+        with self.app.app_context():
+            department = db.session.get(Department, 1)
+            deactivate_record(department)
+            db.session.commit()
+
+            self.assertFalse(db.session.get(Department, department.id).is_active)
 
     def login(self, email):
         return self.client.post(

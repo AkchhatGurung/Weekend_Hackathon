@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash
 
 from app import db
 from app.auth import roles_required
+from app.constants import MIN_PASSWORD_LENGTH
 from app.models import Category, Department, User
 
 management_bp = Blueprint("management", __name__, url_prefix="/admin")
@@ -98,8 +99,11 @@ def create_user():
     department = _selected_department(request.form.get("department_id"))
     if not name or len(name) > 120 or not _valid_email(email):
         flash("Enter a valid name and email address.", "error")
-    elif len(password) < 12:
-        flash("Passwords must be at least 12 characters long.", "error")
+    elif len(password) < MIN_PASSWORD_LENGTH:
+        flash(
+            f"Passwords must be at least {MIN_PASSWORD_LENGTH} characters long.",
+            "error",
+        )
     elif role not in VALID_ROLES:
         flash("Choose a valid role.", "error")
     elif department is False:
@@ -133,8 +137,11 @@ def update_user(user_id):
         flash("Choose a valid role.", "error")
     elif department is False:
         flash("Choose an existing department or leave it unassigned.", "error")
-    elif password and len(password) < 12:
-        flash("Passwords must be at least 12 characters long.", "error")
+    elif password and len(password) < MIN_PASSWORD_LENGTH:
+        flash(
+            f"Passwords must be at least {MIN_PASSWORD_LENGTH} characters long.",
+            "error",
+        )
     else:
         user.name = name
         user.email = email
