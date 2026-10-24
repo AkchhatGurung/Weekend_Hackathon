@@ -349,6 +349,7 @@ td:first-child, th:first-child { padding-left: 1.1rem; }
 .badge-in-progress, .status-in-progress { border-color: #d8e7f4; background: #eaf3fc; color: #285c87; }
 .badge-resolved, .status-resolved { border-color: #d4e9dd; background: #eaf6ef; color: #286747; }
 .badge-rejected, .status-rejected { border-color: #efdada; background: #fbefef; color: #8d4545; }
+.chart-bar.status-submitted { background: #527d91; }
 .badge-priority-urgent, .badge-priority-high { border-color: #efdada; background: #fbefef; color: #8d4545; }
 .badge-priority-normal { border-color: #dce7ec; background: #edf4f7; color: #365e71; }
 .badge-priority-low { border-color: #dce7df; background: #f0f6f1; color: #52715a; }
