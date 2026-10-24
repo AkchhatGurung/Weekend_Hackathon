@@ -23,14 +23,15 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.auth import login_required, officer_required
-from app.models import Category, Complaint, Department
+from app.models import Category, Complaint, Department, User
 from app.services.data import create_complaint as create_complaint_record
 from app.services.data import cancel_complaint as cancel_complaint_record
 from app.services.data import get_complaint_by_ticket
 from app.services.data import can_access_complaint
 from app.services.data import list_complaints as list_complaints_record
-from app.services.data import update_complaint_status as update_complaint_status_record
 from app.services.data import update_complaint as update_complaint_record
+from app.services.data import assign_complaint as assign_complaint_record
+from app.services.data import update_complaint_status as update_complaint_status_record
 
 complaints_bp = Blueprint("complaints", __name__, url_prefix="/complaints")
 ALLOWED_IMAGE_FORMATS = {"JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp"}
@@ -59,9 +60,16 @@ def _visible_complaint(complaint_id):
 def _save_upload(upload):
     if upload is None or not upload.filename:
         return None
-    if len(upload.filename) > 255 or not secure_filename(upload.filename):
+    safe_name = secure_filename(upload.filename)
+    if len(upload.filename) > 255 or not safe_name:
         raise ValueError("Choose a valid image filename.")
-    data = upload.read(current_app.config["MAX_CONTENT_LENGTH"] + 1)
+    source_extension = os.path.splitext(safe_name)[1].lower()
+    if source_extension not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise ValueError("Upload a valid JPEG, PNG, or WebP image.")
+    try:
+        data = upload.read(current_app.config["MAX_CONTENT_LENGTH"] + 1)
+    except OSError as error:
+        raise ValueError("The image could not be read. Please try again.") from error
     if len(data) > current_app.config["MAX_CONTENT_LENGTH"]:
         raise ValueError("Images must be 5 MB or smaller.")
     try:
@@ -80,10 +88,17 @@ def _save_upload(upload):
     extension = ALLOWED_IMAGE_FORMATS.get(image_format)
     if extension is None:
         raise ValueError("Upload a valid JPEG, PNG, or WebP image.")
+    if source_extension == ".jpeg":
+        source_extension = ".jpg"
+    if source_extension != extension:
+        raise ValueError("The image content does not match its filename extension.")
     key = f"{uuid.uuid4().hex}{extension}"
     destination = os.path.join(current_app.config["UPLOAD_FOLDER"], key)
-    with open(destination, "wb") as image_file:
-        image_file.write(data)
+    try:
+        with open(destination, "xb") as image_file:
+            image_file.write(data)
+    except OSError as error:
+        raise ValueError("The image could not be stored. Please try again.") from error
     return key
 
 
@@ -187,7 +202,45 @@ def create_complaint():
 @login_required
 def view_complaint(complaint_id):
     complaint = _visible_complaint(complaint_id)
-    return render_template("complaints/detail.html", complaint=complaint)
+    departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
+    officers = User.query.filter_by(role="officer", is_active=True).order_by(User.name).all()
+    return render_template(
+        "complaints/detail.html",
+        complaint=complaint,
+        departments=departments,
+        officers=officers,
+    )
+
+
+@complaints_bp.post("/<int:complaint_id>/assignment")
+@login_required
+def assign_complaint(complaint_id):
+    complaint = db.get_or_404(Complaint, complaint_id)
+    if g.user.role != "admin":
+        abort(403)
+    try:
+        department_id = int(request.form.get("department_id", ""))
+        department = db.session.get(Department, department_id)
+        assigned_to = request.form.get("assigned_to", "").strip()
+        officer = db.session.get(User, int(assigned_to)) if assigned_to else None
+        assign_complaint_record(
+            complaint,
+            g.user,
+            department,
+            officer,
+            request.form.get("remarks", "Assignment updated."),
+        )
+        db.session.commit()
+    except (TypeError, ValueError) as error:
+        db.session.rollback()
+        flash(str(error), "error")
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not assign complaint %s.", complaint.id)
+        flash("The complaint assignment could not be saved. Please try again.", "error")
+    else:
+        flash("Complaint assignment updated.", "success")
+    return redirect(url_for("complaints.view_complaint", complaint_id=complaint.id))
 
 
 @complaints_bp.post("/<int:complaint_id>/status")

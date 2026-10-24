@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
+﻿from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +18,11 @@ from app.models import (
 VALID_ROLES = {"student", "staff", "officer", "admin"}
 VALID_PRIORITIES = {"Low", "Normal", "High", "Urgent"}
 VALID_STATUSES = {"Submitted", "In Progress", "Resolved", "Rejected", "Cancelled"}
+WORKFLOW_STATUSES = {"Submitted", "In Progress", "Resolved", "Rejected"}
+ALLOWED_STATUS_TRANSITIONS = {
+    "Submitted": {"In Progress", "Resolved", "Rejected"},
+    "In Progress": {"Resolved", "Rejected", "Submitted"},
+}
 
 
 def utcnow():
@@ -202,6 +207,95 @@ def can_access_complaint(actor, complaint):
     return actor.id == complaint.reporter_id
 
 
+def can_manage_complaint(actor, complaint):
+    if actor is None or complaint is None or not actor.is_active:
+        return False
+    if actor.role == "admin":
+        return True
+    return (
+        actor.role == "officer"
+        and actor.department_id is not None
+        and actor.department_id == complaint.department_id
+    )
+
+
+def assign_complaint(
+    complaint, actor, department, assignee=None, remarks="Assignment updated."
+):
+    if actor.role != "admin":
+        raise ValueError("Only administrators can assign complaints.")
+    if not department or not department.is_active:
+        raise ValueError("An active department is required.")
+    if assignee is not None:
+        if assignee.role != "officer" or not assignee.is_active:
+            raise ValueError("Choose an active officer.")
+        if assignee.department_id != department.id:
+            raise ValueError("The officer must belong to the selected department.")
+    complaint.department = department
+    complaint.assignee = assignee
+    db.session.add(
+        ComplaintHistory(
+            complaint=complaint,
+            actor_id=actor.id,
+            action="Assigned",
+            old_status=complaint.status,
+            new_status=complaint.status,
+            remarks=_require(remarks, "Remarks"),
+        )
+    )
+    db.session.flush()
+    return complaint
+
+
+def update_complaint_status(
+    complaint,
+    actor,
+    new_status=None,
+    remarks="",
+    rejection_reason=None,
+    resolution_notes=None,
+    status=None,
+):
+    new_status = new_status or status
+    if not can_manage_complaint(actor, complaint):
+        raise ValueError("You are not allowed to update this complaint.")
+    if complaint.status not in {"Submitted", "In Progress"}:
+        raise ValueError("Only open complaints can be updated.")
+    if new_status not in WORKFLOW_STATUSES:
+        raise ValueError("Choose a valid complaint status.")
+    old_status = complaint.status
+    if new_status == old_status:
+        raise ValueError("Choose a different complaint status.")
+    if new_status not in ALLOWED_STATUS_TRANSITIONS.get(old_status, set()):
+        raise ValueError(
+            f"Cannot transition a complaint from {old_status} to {new_status}."
+        )
+    if new_status == "Rejected":
+        rejection_reason = _validate_complaint_text(
+            rejection_reason, "Rejection reason", 5000
+        )
+    if new_status == "Resolved":
+        resolution_notes = _validate_complaint_text(
+            resolution_notes, "Resolution notes", 5000
+        )
+    complaint.status = new_status
+    complaint.rejection_reason = rejection_reason if new_status == "Rejected" else None
+    complaint.resolution_notes = resolution_notes if new_status == "Resolved" else None
+    complaint.resolved_at = utcnow() if new_status == "Resolved" else None
+    db.session.add(
+        ComplaintHistory(
+            complaint=complaint,
+            actor_id=actor.id,
+            action="Status changed",
+            old_status=old_status,
+            new_status=new_status,
+            remarks=_require(remarks, "Remarks") if remarks else None,
+        )
+    )
+    db.session.flush()
+    return complaint
+
+
 def cancel_complaint(complaint, actor, remarks="Complaint cancelled by reporter."):
     if not can_access_complaint(actor, complaint) or actor.role not in {"student", "staff"}:
         raise ValueError("You are not allowed to cancel this complaint.")
@@ -216,64 +310,6 @@ def cancel_complaint(complaint, actor, remarks="Complaint cancelled by reporter.
             old_status="Submitted",
             new_status="Cancelled",
             remarks=_require(remarks, "Remarks"),
-        )
-    )
-    db.session.flush()
-    return complaint
-
-
-def update_complaint_status(
-    complaint,
-    actor,
-    status,
-    remarks="",
-    resolution_notes="",
-    rejection_reason="",
-):
-    if actor is None or actor.role not in {"officer", "admin"}:
-        raise ValueError("You are not allowed to update complaint status.")
-    if not can_access_complaint(actor, complaint):
-        raise ValueError("You are not allowed to update this complaint.")
-    if complaint.status not in {"Submitted", "In Progress"}:
-        raise ValueError("Only open complaints can be updated.")
-    if status not in {"In Progress", "Resolved", "Rejected"}:
-        raise ValueError("Choose a valid status.")
-    if status == complaint.status:
-        raise ValueError("Choose a different status from the current status.")
-
-    remarks = (remarks or "").strip()
-    if len(remarks) > 5000:
-        raise ValueError("Remarks must be 5,000 characters or fewer.")
-
-    if status == "Resolved":
-        resolution_notes = _validate_complaint_text(
-            resolution_notes, "Resolution notes", 5000
-        )
-        complaint.resolution_notes = resolution_notes
-        complaint.rejection_reason = None
-        complaint.resolved_at = utcnow()
-    elif status == "Rejected":
-        rejection_reason = _validate_complaint_text(
-            rejection_reason, "Rejection reason", 5000
-        )
-        complaint.rejection_reason = rejection_reason
-        complaint.resolution_notes = None
-        complaint.resolved_at = None
-    else:
-        complaint.resolution_notes = None
-        complaint.rejection_reason = None
-        complaint.resolved_at = None
-
-    old_status = complaint.status
-    complaint.status = status
-    db.session.add(
-        ComplaintHistory(
-            complaint=complaint,
-            actor_id=actor.id,
-            action="Status updated",
-            old_status=old_status,
-            new_status=status,
-            remarks=remarks or None,
         )
     )
     db.session.flush()

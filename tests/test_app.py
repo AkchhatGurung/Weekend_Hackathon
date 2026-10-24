@@ -541,6 +541,121 @@ class CampusAppTests(unittest.TestCase):
         with self.app.app_context():
             self.assertEqual(Complaint.query.count(), 0)
 
+    def test_status_updates_require_authorization_and_valid_transition(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        response = self.client.post(
+            "/complaints/1/status",
+            data={"status": "Resolved", "resolution_notes": "Done"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+        self.client.post("/logout")
+        self.login("officer@example.edu")
+        response = self.client.post(
+            "/complaints/1/status",
+            data={"status": "Resolved", "resolution_notes": "Done"},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Complaint status updated to Resolved.", response.data)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.status, "Resolved")
+            self.assertEqual(ComplaintHistory.query.count(), 2)
+
+    def test_status_history_require_reason_and_terminal_status(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        self.client.post("/logout")
+        self.login("officer@example.edu")
+
+        response = self.client.post(
+            "/complaints/1/status",
+            data={"status": "In Progress", "remarks": "Assigned for review."},
+        )
+        self.assertEqual(response.status_code, 302)
+        response = self.client.post(
+            "/complaints/1/status",
+            data={"status": "Rejected"},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Rejection reason is required.", response.data)
+        response = self.client.post(
+            "/complaints/1/status",
+            data={"status": "Resolved", "resolution_notes": "Fixed"},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Resolved", response.data)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.status, "Resolved")
+            self.assertIsNotNone(complaint.resolved_at)
+            self.assertEqual(ComplaintHistory.query.count(), 3)
+            self.assertEqual(ComplaintHistory.query.order_by(ComplaintHistory.id).all()[-1].old_status, "In Progress")
+
+        response = self.client.post(
+            "/complaints/1/status",
+            data={"status": "In Progress", "remarks": "Reopened for verification."},
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Only open complaints can be updated.", response.data)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.status, "Resolved")
+            self.assertIsNotNone(complaint.resolved_at)
+            self.assertEqual(ComplaintHistory.query.count(), 3)
+
+    def test_admin_can_reassign_department_and_officer(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        self.client.post("/logout")
+        self.login("admin@example.edu")
+        with self.app.app_context():
+            department = Department(name="IT")
+            officer = User(
+                name="IT Officer",
+                email="it-officer@example.edu",
+                password_hash=generate_password_hash("correct-horse-battery"),
+                role="officer",
+                department=department,
+            )
+            db.session.add_all([department, officer])
+            db.session.commit()
+            department_id = department.id
+            officer_id = officer.id
+        response = self.client.post(
+            "/complaints/1/assignment",
+            data={
+                "department_id": str(department_id),
+                "assigned_to": str(officer_id),
+                "remarks": "Routed to IT.",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.department_id, department_id)
+            self.assertEqual(complaint.assigned_to, officer_id)
+            history = ComplaintHistory.query.order_by(ComplaintHistory.id).all()[-1]
+            self.assertEqual(history.action, "Assigned")
+            self.assertEqual(history.old_status, "Submitted")
+
+    def test_image_extension_must_match_content(self):
+        self.login("student@example.edu")
+        image_data = BytesIO()
+        Image.new("RGB", (8, 8), color="blue").save(image_data, format="PNG")
+        image_data.seek(0)
+        response = self.client.post(
+            "/complaints/new",
+            data=self.complaint_form(image=(image_data, "evidence.jpg")),
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"content does not match", response.data)
+        with self.app.app_context():
+            self.assertEqual(Complaint.query.count(), 0)
+
     def test_admin_can_manage_reference_data_but_student_cannot(self):
         self.login("student@example.edu")
         self.assertEqual(self.client.get("/admin/").status_code, 403)

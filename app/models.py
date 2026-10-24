@@ -133,6 +133,7 @@ class Complaint(db.Model):
     reporter = db.relationship(
         "User", foreign_keys=[reporter_id], back_populates="complaints"
     )
+    assignee = db.relationship("User", foreign_keys=[assigned_to])
     category = db.relationship("Category", back_populates="complaints")
     department = db.relationship("Department", back_populates="complaints")
     history = db.relationship(

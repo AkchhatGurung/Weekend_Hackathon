@@ -1,13 +1,17 @@
 # Smart Campus Complaint and Grievance Management System
 
-Phase 1 provides a Flask application factory, Flask-SQLAlchemy, Flask-Migrate,
-Flask-Login, CSRF protection, login and role checks, complaint
+The application provides a Flask application factory, Flask-SQLAlchemy,
+Flask-Migrate, Flask-Login, CSRF protection, login and role checks, complaint
 submission/list/detail/edit, admin maintenance for users/departments/categories,
-department-scoped officer and admin status transitions, password hashing,
-image validation, and complaint history records for submissions, edits,
-cancellations, and status changes.
+password hashing, private image storage, department routing, assignment,
+validated complaint status transitions, and complaint history records.
 
-Feedback and aggregate analytics are not implemented in this phase. Complaints are not physically deleted because their history is retained as an audit record. Users, departments and categories can be deactivated.
+Complaint status transitions are Submitted -> In Progress, Resolved, or
+Rejected, and In Progress -> Submitted, Resolved, or Rejected. Resolved and
+Rejected are terminal statuses in the current workflow and cannot be reopened.
+Rejected complaints require a rejection reason and Resolved complaints require
+resolution notes. Complaints and history are never physically deleted; users,
+departments and categories can be deactivated.
 
 ## Requirements
 
@@ -51,15 +55,26 @@ The `smart_campus_grievance_schema.sql` file is the shared reference schema. For
 - `GET /login`, `POST /login`, `POST /logout`
 - `GET /complaints` (paginated; supports `status`, `category_id`, `date_from`, and `date_to` filters), `GET|POST /complaints/new`
 - `GET /complaints/<id>`, `GET /complaints/ticket/<ticket_id>`, `GET|POST /complaints/<id>/edit`
-- `POST /complaints/<id>/status` (officers within their department, administrators)
 - `POST /complaints/<id>/cancel` (reporter cancellation while status is `Submitted`)
+- `POST /complaints/<id>/status` (department officers and administrators)
+- `POST /complaints/<id>/assignment` (administrators)
 - `GET /complaints/<id>/image`
 - `GET /admin`
 - `POST /admin/departments`, `POST /admin/departments/<id>`
 - `POST /admin/categories`, `POST /admin/categories/<id>`
 - `POST /admin/users`, `POST /admin/users/<id>`
 
-Students and staff can access their own complaints; officers can access complaints in their department; administrators can access all complaints and manage reference data and accounts. Complaint editing is limited to its reporter while status is `Submitted`, and cancellation is recorded as a `Cancelled` status with a history entry rather than deleting the complaint. Officers and administrators can move open complaints to `In Progress`, `Resolved`, or `Rejected`; resolution notes and rejection reasons are required as appropriate, and all status changes are recorded in complaint history. Terminal complaints cannot be reopened through this workflow. Ticket IDs are derived from database-generated primary keys, and the complaint plus initial history entry are committed together.
+Students and staff can access their own complaints; officers can access complaints
+in their department; administrators can access all complaints and manage
+reference data, accounts, assignments, and status. New complaints inherit the
+category's configured default department. Assignment requires an active
+department and, when selected, an active officer in that department. Complaint
+editing is limited to its reporter while status is `Submitted`, and cancellation
+is recorded as a `Cancelled` status with a history entry rather than deleting the
+complaint. Ticket IDs are derived from database-generated primary keys, and the
+complaint plus initial history entry are committed together. Uploaded images
+are content-checked, size-limited, renamed server-side, and served only through
+an authenticated complaint endpoint.
 
 ## Tests
 

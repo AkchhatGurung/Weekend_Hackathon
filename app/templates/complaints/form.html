@@ -82,10 +82,10 @@
           : "Assigned by the selected category";
       });
 
-      const clearPreview = () => {
+      const clearPreview = (clearInput = true) => {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         previewUrl = undefined;
-        imageInput.value = "";
+        if (clearInput) imageInput.value = "";
         imageInput.setCustomValidity("");
         preview.removeAttribute("src");
         previewContainer.hidden = true;
@@ -94,8 +94,8 @@
       };
 
       imageInput.addEventListener("change", () => {
-        clearPreview();
         const file = imageInput.files[0];
+        clearPreview(false);
         if (!file) return;
 
         const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
