@@ -42,6 +42,49 @@
     });
   });
 
+  document.querySelectorAll("[data-dashboard-filters]").forEach((filters) => {
+    const searchInput = filters.querySelector("[data-complaint-search]");
+    const statusSelect = filters.querySelector("[data-complaint-status]");
+    const list = document.querySelector("[data-complaint-list]");
+    const filterEmpty = document.querySelector("[data-filter-empty]");
+    const filterStatus = document.querySelector("[data-filter-status]");
+
+    if (
+      !(searchInput instanceof HTMLInputElement) ||
+      !(statusSelect instanceof HTMLSelectElement) ||
+      !list ||
+      !filterEmpty ||
+      !filterStatus
+    ) {
+      return;
+    }
+
+    const items = Array.from(list.querySelectorAll("[data-complaint-item]"));
+    const updateComplaints = () => {
+      const query = searchInput.value.trim().toLocaleLowerCase();
+      const status = statusSelect.value;
+      let visibleCount = 0;
+
+      items.forEach((item) => {
+        const matchesQuery = (item.getAttribute("data-search") ?? "")
+          .toLocaleLowerCase()
+          .includes(query);
+        const matchesStatus = !status || item.getAttribute("data-status") === status;
+        const isVisible = matchesQuery && matchesStatus;
+        item.hidden = !isVisible;
+        if (isVisible) visibleCount += 1;
+      });
+
+      filterEmpty.hidden = visibleCount !== 0;
+      filterStatus.textContent = `Showing ${visibleCount} of ${items.length} complaints`;
+    };
+
+    searchInput.disabled = false;
+    statusSelect.disabled = false;
+    searchInput.addEventListener("input", updateComplaints);
+    statusSelect.addEventListener("change", updateComplaints);
+  });
+
   document.querySelectorAll("form[data-loading-form]").forEach((form) => {
     form.addEventListener("submit", (event) => {
       if (!form.reportValidity()) {

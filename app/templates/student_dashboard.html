@@ -1,0 +1,103 @@
+{% set counts = namespace(submitted=0, in_progress=0, resolved=0) %}
+{% for complaint in complaints %}
+  {% if complaint.status == 'Submitted' %}{% set counts.submitted = counts.submitted + 1 %}{% endif %}
+  {% if complaint.status == 'In Progress' %}{% set counts.in_progress = counts.in_progress + 1 %}{% endif %}
+  {% if complaint.status == 'Resolved' %}{% set counts.resolved = counts.resolved + 1 %}{% endif %}
+{% endfor %}
+
+<section class="dashboard-welcome" aria-labelledby="dashboard-title">
+  <div class="page-heading">
+    <div class="page-intro">
+      <p class="eyebrow">Student portal</p>
+      <h1 id="dashboard-title">Welcome, {{ g.user.name }}</h1>
+      <p>See the status of your campus concerns and keep track of what happens next.</p>
+    </div>
+    <a class="button dashboard-new-complaint" href="{{ url_for('complaints.create_complaint') }}">
+      <span aria-hidden="true">+</span> New complaint
+    </a>
+  </div>
+</section>
+
+<section class="dashboard-stats" aria-label="Complaint summary">
+  <article class="stat-card">
+    <span class="stat-label">Total complaints</span>
+    <strong class="stat-value">{{ complaints|length }}</strong>
+    <span class="stat-note">Across all statuses</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">Submitted</span>
+    <strong class="stat-value">{{ counts.submitted }}</strong>
+    <span class="stat-note">Awaiting review</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">In progress</span>
+    <strong class="stat-value">{{ counts.in_progress }}</strong>
+    <span class="stat-note">Being addressed</span>
+  </article>
+  <article class="stat-card">
+    <span class="stat-label">Resolved</span>
+    <strong class="stat-value">{{ counts.resolved }}</strong>
+    <span class="stat-note">Completed</span>
+  </article>
+</section>
+
+<section class="dashboard-list-section" aria-labelledby="complaints-heading">
+  <div class="dashboard-list-heading">
+    <div>
+      <p class="eyebrow">Your activity</p>
+      <h2 id="complaints-heading">Your complaints</h2>
+    </div>
+    {% if complaints %}
+      <span class="result-count">{{ complaints|length }} total</span>
+    {% endif %}
+  </div>
+
+  {% if complaints %}
+    <div class="dashboard-filters" data-dashboard-filters>
+      <div class="form-field dashboard-search">
+        <label for="complaint-search">Search complaints</label>
+        <input id="complaint-search" type="search" placeholder="Search by ticket, title, category…" autocomplete="off" disabled data-complaint-search>
+      </div>
+      <div class="form-field dashboard-status-filter">
+        <label for="complaint-status">Filter by status</label>
+        <select id="complaint-status" disabled data-complaint-status>
+          <option value="">All statuses</option>
+          <option value="submitted">Submitted</option>
+          <option value="in progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+    </div>
+    <p class="form-hint filter-hint" data-filter-status aria-live="polite"></p>
+    <ul class="complaint-cards" data-complaint-list>
+      {% for complaint in complaints %}
+        <li class="complaint-card" data-complaint-item data-status="{{ complaint.status|lower }}" data-search="{{ complaint.ticket_id }} {{ complaint.title }} {{ complaint.category.name }} {{ complaint.department.name if complaint.department else 'Unassigned' }}">
+          <article>
+            <div class="complaint-card-main">
+              <div class="complaint-title-row">
+                <h3><a href="{{ url_for('complaints.view_complaint', complaint_id=complaint.id) }}">{{ complaint.title }}</a></h3>
+                <span class="badge status-{{ complaint.status|lower|replace(' ', '-') }}">{{ complaint.status }}</span>
+              </div>
+              <p class="complaint-ticket">{{ complaint.ticket_id }}</p>
+              <dl class="complaint-meta">
+                <div><dt>Category</dt><dd>{{ complaint.category.name }}</dd></div>
+                <div><dt>Department</dt><dd>{{ complaint.department.name if complaint.department else 'Unassigned' }}</dd></div>
+                <div><dt>Submitted</dt><dd><time datetime="{{ complaint.created_at.isoformat() }}">{{ complaint.created_at.strftime('%b %d, %Y') }}</time></dd></div>
+              </dl>
+            </div>
+          </article>
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="filter-empty empty-state" hidden data-filter-empty>No complaints match those filters. Try a different search or status.</p>
+  {% else %}
+    <section class="empty-state dashboard-empty-state" aria-labelledby="first-complaint-title">
+      <span class="empty-state-icon" aria-hidden="true">+</span>
+      <p class="eyebrow">A better campus starts here</p>
+      <h2 id="first-complaint-title">No complaints yet</h2>
+      <p>If something on campus needs attention, tell us about it. You can follow its progress here.</p>
+      <a class="button" href="{{ url_for('complaints.create_complaint') }}">Submit your first complaint</a>
+    </section>
+  {% endif %}
+</section>

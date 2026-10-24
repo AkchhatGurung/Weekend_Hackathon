@@ -89,6 +89,74 @@ class CampusAppTests(unittest.TestCase):
             follow_redirects=True,
         )
 
+    def test_student_registration_creates_and_signs_in_student(self):
+        response = self.client.post(
+            "/register",
+            data={
+                "name": "New Student",
+                "email": "  NEW-STUDENT@example.edu ",
+                "password": "a-long-secure-password",
+                "password_confirmation": "a-long-secure-password",
+            },
+            follow_redirects=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Your student account is ready.", response.data)
+        self.assertIn(b"Welcome, New Student", response.data)
+        with self.app.app_context():
+            user = User.query.filter_by(email="new-student@example.edu").one()
+            self.assertEqual(user.role, "student")
+            self.assertTrue(user.check_password("a-long-secure-password"))
+
+    def test_student_registration_validates_fields_and_existing_email(self):
+        invalid_responses = (
+            (
+                {
+                    "name": "New Student",
+                    "email": "new-student@example.edu",
+                    "password": "short",
+                    "password_confirmation": "short",
+                },
+                b"at least 12 characters",
+            ),
+            (
+                {
+                    "name": "New Student",
+                    "email": "new-student@example.edu",
+                    "password": "a-long-secure-password",
+                    "password_confirmation": "a-different-password",
+                },
+                b"confirmation does not match",
+            ),
+            (
+                {
+                    "name": "New Student",
+                    "email": "not-an-email",
+                    "password": "a-long-secure-password",
+                    "password_confirmation": "a-long-secure-password",
+                },
+                b"valid email address",
+            ),
+            (
+                {
+                    "name": "New Student",
+                    "email": "student@example.edu",
+                    "password": "a-long-secure-password",
+                    "password_confirmation": "a-long-secure-password",
+                },
+                b"already exists",
+            ),
+        )
+        for data, message in invalid_responses:
+            with self.subTest(message=message):
+                response = self.client.post("/register", data=data)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(message, response.data)
+
+        with self.app.app_context():
+            self.assertIsNone(User.query.filter_by(email="new-student@example.edu").first())
+
     def complaint_form(self, **updates):
         data = {
             "title": "Broken light",
