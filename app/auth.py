@@ -1,7 +1,10 @@
 from functools import wraps
+import re
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_user, logout_user
+from sqlalchemy.exc import IntegrityError
+from werkzeug.security import generate_password_hash
 
 from app import db
 from app.models import User
@@ -72,6 +75,51 @@ def login():
     if error:
         flash(error, "error")
     return render_template("auth/login.html")
+
+
+@auth_bp.route("/register", methods=["GET", "POST"])
+def register():
+    if g.user is not None:
+        return redirect(url_for("complaints.list_complaints"))
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        password_confirmation = request.form.get("password_confirmation", "")
+
+        if not name or len(name) > 120:
+            flash("Enter your name (up to 120 characters).", "error")
+        elif (
+            len(email) > 255
+            or re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is None
+        ):
+            flash("Enter a valid email address.", "error")
+        elif len(password) < 12:
+            flash("Your password must be at least 12 characters long.", "error")
+        elif password != password_confirmation:
+            flash("The password confirmation does not match.", "error")
+        elif User.query.filter_by(email=email).first() is not None:
+            flash("An account with that email already exists. Please sign in.", "error")
+        else:
+            user = User(
+                name=name,
+                email=email,
+                password_hash=generate_password_hash(password),
+                role="student",
+            )
+            db.session.add(user)
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                flash("An account with that email already exists. Please sign in.", "error")
+            else:
+                login_user(user)
+                flash("Your student account is ready. Welcome to Smart Campus!", "success")
+                return redirect(url_for("complaints.list_complaints"))
+
+    return render_template("auth/register.html")
 
 
 @auth_bp.post("/logout")

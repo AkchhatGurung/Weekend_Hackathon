@@ -2,20 +2,33 @@
 {% block title %}Sign in · Smart Campus Grievances{% endblock %}
 {% block content %}
   <section class="card narrow">
-    <p class="eyebrow">Welcome back</p>
-    <h1>Sign in</h1>
-    <p>Access your campus complaint workspace.</p>
-    <form method="post" data-loading-form>
+    <p class="eyebrow">Smart Campus</p>
+    <h1>Welcome back</h1>
+    <p>Sign in with your university email to access your complaint workspace.</p>
+    <form method="post" action="{{ url_for('auth.login') }}" data-loading-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-field">
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="username" required maxlength="255">
+        <label for="email">University email</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value="{{ request.form.get('email', '') }}"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          inputmode="email"
+          required
+          maxlength="255"
+          aria-describedby="email-hint">
+        <p class="form-hint" id="email-hint">Use the email address linked to your university account.</p>
       </div>
       <div class="form-field">
         <label for="password">Password</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required>
       </div>
-      <button type="submit" data-loading-text="Signing in…">Sign in</button>
+      <button type="submit" data-loading-text="Signing in…" aria-live="polite">Sign in</button>
     </form>
+    <p class="auth-switch">New to Smart Campus? <a href="{{ url_for('auth.register') }}">Create a student account</a></p>
   </section>
 {% endblock %}
