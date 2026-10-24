@@ -9,6 +9,9 @@
     </div>
     {% if complaint.reporter_id == g.user.id and complaint.status == 'Submitted' %}
       <a class="button secondary" href="{{ url_for('complaints.edit_complaint', complaint_id=complaint.id) }}">Edit complaint</a>
+      <form method="post" action="{{ url_for('complaints.cancel_complaint', complaint_id=complaint.id) }}">
+        <button class="button secondary" type="submit">Cancel complaint</button>
+      </form>
     {% endif %}
   </div>
 

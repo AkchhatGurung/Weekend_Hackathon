@@ -8,7 +8,8 @@
       <p>{{ 'Review complaints visible to your department and open a ticket to view its full details.' if g.user.role == 'officer' else ('Review your campus concerns and keep track of what happens next.' if g.user.role == 'student' else 'Track campus concerns and their current status.') }}</p>
     </div>
   </div>
-  {% if complaints %}
+  {% set complaint_items = complaints.items if complaints.items is defined else complaints %}
+  {% if complaint_items %}
     <div class="dashboard-filters" data-dashboard-filters>
       <div class="form-field dashboard-search">
         <label for="complaint-search">Search complaints</label>
@@ -46,7 +47,7 @@
     {% if g.user.role == 'officer' %}
       <p class="form-hint">The server limits this queue to complaints in your assigned department. Search and filters apply only to the records returned by the server.</p>
     {% endif %}
-    <p class="form-hint filter-hint" data-filter-status aria-live="polite">{{ complaints|length }} complaints</p>
+    <p class="form-hint filter-hint" data-filter-status aria-live="polite">{{ complaints.total if complaints.total is defined else complaint_items|length }} complaints</p>
     <div class="table-wrap">
       <table>
         <caption class="visually-hidden">Complaints visible to your account</caption>
@@ -62,7 +63,7 @@
           </tr>
         </thead>
         <tbody data-complaint-list>
-          {% for complaint in complaints %}
+          {% for complaint in complaint_items %}
             <tr
               data-complaint-item
               data-status="{{ complaint.status|lower }}"
@@ -82,6 +83,13 @@
       </table>
     </div>
     <p class="empty-state filter-empty" hidden data-filter-empty>No complaints match your search or status filter.</p>
+    {% if complaints.pages is defined and complaints.pages > 1 %}
+      <nav aria-label="Complaint pages">
+        {% if complaints.has_prev %}<a href="{{ url_for('complaints.list_complaints', page=complaints.prev_num) }}">Previous</a>{% endif %}
+        <span>Page {{ complaints.page }} of {{ complaints.pages }}</span>
+        {% if complaints.has_next %}<a href="{{ url_for('complaints.list_complaints', page=complaints.next_num) }}">Next</a>{% endif %}
+      </nav>
+    {% endif %}
   {% else %}
     <section class="empty-state" aria-labelledby="empty-complaints-title">
       <span class="empty-state-icon" aria-hidden="true">+</span>

@@ -148,7 +148,7 @@ class Complaint(db.Model):
             name="ck_complaints_priority",
         ),
         db.CheckConstraint(
-            "status IN ('Submitted', 'In Progress', 'Resolved', 'Rejected')",
+            "status IN ('Submitted', 'In Progress', 'Resolved', 'Rejected', 'Cancelled')",
             name="ck_complaints_status",
         ),
         db.CheckConstraint(

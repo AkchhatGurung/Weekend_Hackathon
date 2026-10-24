@@ -48,15 +48,16 @@ The `smart_campus_grievance_schema.sql` file is the shared reference schema. For
 - `GET /health`
 
 - `GET /login`, `POST /login`, `POST /logout`
-- `GET /complaints`, `GET|POST /complaints/new`
-- `GET /complaints/<id>`, `GET|POST /complaints/<id>/edit`
+- `GET /complaints` (paginated; supports `status`, `category_id`, `date_from`, and `date_to` filters), `GET|POST /complaints/new`
+- `GET /complaints/<id>`, `GET /complaints/ticket/<ticket_id>`, `GET|POST /complaints/<id>/edit`
+- `POST /complaints/<id>/cancel` (reporter cancellation while status is `Submitted`)
 - `GET /complaints/<id>/image`
 - `GET /admin`
 - `POST /admin/departments`, `POST /admin/departments/<id>`
 - `POST /admin/categories`, `POST /admin/categories/<id>`
 - `POST /admin/users`, `POST /admin/users/<id>`
 
-Students and staff can access their own complaints; officers can access complaints assigned to their department; administrators can access all complaints and manage reference data and accounts. Complaint editing is limited to its reporter while status is `Submitted`. Status changes are intentionally reserved for the workflow phase.
+Students and staff can access their own complaints; officers can access complaints assigned to their department; administrators can access all complaints and manage reference data and accounts. Complaint editing is limited to its reporter while status is `Submitted`, and cancellation is recorded as a `Cancelled` status with a history entry rather than deleting the complaint. Ticket IDs are derived from database-generated primary keys, and the complaint plus initial history entry are committed together. Status changes other than reporter cancellation are reserved for the workflow phase.
 
 ## Tests
 

@@ -13,6 +13,12 @@ depends_on = None
 
 
 def upgrade():
+    op.drop_constraint("ck_complaints_status", "complaints", type_="check")
+    op.create_check_constraint(
+        "ck_complaints_status",
+        "complaints",
+        "status IN ('Submitted', 'In Progress', 'Resolved', 'Rejected', 'Cancelled')",
+    )
     op.create_check_constraint(
         "ck_complaints_resolved_completion",
         "complaints",
@@ -25,4 +31,10 @@ def downgrade():
         "ck_complaints_resolved_completion",
         "complaints",
         type_="check",
+    )
+    op.drop_constraint("ck_complaints_status", "complaints", type_="check")
+    op.create_check_constraint(
+        "ck_complaints_status",
+        "complaints",
+        "status IN ('Submitted', 'In Progress', 'Resolved', 'Rejected')",
     )

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +17,7 @@ from app.models import (
 
 VALID_ROLES = {"student", "staff", "officer", "admin"}
 VALID_PRIORITIES = {"Low", "Normal", "High", "Urgent"}
-VALID_STATUSES = {"Submitted", "In Progress", "Resolved", "Rejected"}
+VALID_STATUSES = {"Submitted", "In Progress", "Resolved", "Rejected", "Cancelled"}
 
 
 def utcnow():
@@ -28,6 +28,13 @@ def _require(value, field):
     if value is None or (isinstance(value, str) and not value.strip()):
         raise ValueError(f"{field} is required.")
     return value.strip() if isinstance(value, str) else value
+
+
+def _validate_complaint_text(value, field, maximum):
+    value = _require(value, field)
+    if not isinstance(value, str) or len(value) > maximum:
+        raise ValueError(f"{field} must contain 1 to {maximum} characters.")
+    return value
 
 
 def create_department(name):
@@ -118,9 +125,9 @@ def create_complaint(
         reporter=reporter,
         category=category,
         department=category.default_department,
-        title=_require(title, "Title"),
-        description=_require(description, "Description"),
-        location=_require(location, "Location"),
+        title=_validate_complaint_text(title, "Title", 200),
+        description=_validate_complaint_text(description, "Description", 10000),
+        location=_validate_complaint_text(location, "Location", 200),
         priority=priority,
         image_key=image_key,
     )
@@ -142,6 +149,8 @@ def create_complaint(
 
 
 def update_complaint(complaint, actor, values, remarks):
+    if actor.id != complaint.reporter_id and actor.role not in {"officer", "admin"}:
+        raise ValueError("You are not allowed to update this complaint.")
     if complaint.status != "Submitted":
         raise ValueError("Only submitted complaints can be edited.")
     category = values.get("category", complaint.category)
@@ -155,6 +164,9 @@ def update_complaint(complaint, actor, values, remarks):
     complaint.department = category.default_department
     for field in ("title", "description", "location", "image_key"):
         if field in values:
+            if field != "image_key":
+                maximum = {"title": 200, "description": 10000, "location": 200}[field]
+                values[field] = _validate_complaint_text(values[field], field.title(), maximum)
             setattr(complaint, field, values[field])
     complaint.priority = priority
     db.session.add(
@@ -175,7 +187,45 @@ def get_complaint(complaint_id):
     return db.session.get(Complaint, complaint_id)
 
 
-def list_complaints(*, reporter_id=None, department_id=None, status=None):
+def get_complaint_by_ticket(ticket_id):
+    ticket_id = _require(ticket_id, "Ticket ID")
+    return db.session.scalar(select(Complaint).where(Complaint.ticket_id == ticket_id))
+
+
+def can_access_complaint(actor, complaint):
+    if actor is None or complaint is None:
+        return False
+    if actor.role == "admin":
+        return True
+    if actor.role == "officer":
+        return actor.department_id is not None and actor.department_id == complaint.department_id
+    return actor.id == complaint.reporter_id
+
+
+def cancel_complaint(complaint, actor, remarks="Complaint cancelled by reporter."):
+    if not can_access_complaint(actor, complaint) or actor.role not in {"student", "staff"}:
+        raise ValueError("You are not allowed to cancel this complaint.")
+    if complaint.status != "Submitted":
+        raise ValueError("Only submitted complaints can be cancelled.")
+    complaint.status = "Cancelled"
+    db.session.add(
+        ComplaintHistory(
+            complaint=complaint,
+            actor_id=actor.id,
+            action="Cancelled",
+            old_status="Submitted",
+            new_status="Cancelled",
+            remarks=_require(remarks, "Remarks"),
+        )
+    )
+    db.session.flush()
+    return complaint
+
+
+def list_complaints(
+    *, reporter_id=None, department_id=None, status=None, category_id=None,
+    date_from=None, date_to=None, page=None, per_page=20
+):
     statement = select(Complaint).order_by(Complaint.created_at.desc())
     if reporter_id is not None:
         statement = statement.where(Complaint.reporter_id == reporter_id)
@@ -185,7 +235,33 @@ def list_complaints(*, reporter_id=None, department_id=None, status=None):
         if status not in VALID_STATUSES:
             raise ValueError("Invalid complaint status.")
         statement = statement.where(Complaint.status == status)
+    if category_id is not None:
+        statement = statement.where(Complaint.category_id == category_id)
+    if date_from is not None:
+        statement = statement.where(Complaint.created_at >= _date_boundary(date_from, False))
+    if date_to is not None:
+        statement = statement.where(Complaint.created_at < _date_boundary(date_to, True))
+    if page is not None:
+        if page < 1 or per_page < 1 or per_page > 100:
+            raise ValueError("Page must be positive and per_page must be between 1 and 100.")
+        return db.paginate(statement, page=page, per_page=per_page, error_out=False)
     return db.session.scalars(statement).all()
+
+
+def _date_boundary(value, end):
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        if end:
+            return datetime.combine(value, time.min, tzinfo=timezone.utc) + timedelta(days=1)
+        return datetime.combine(value, time.min, tzinfo=timezone.utc)
+    try:
+        parsed = date.fromisoformat(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Dates must use YYYY-MM-DD format.") from error
+    if end:
+        return datetime.combine(parsed, time.min, tzinfo=timezone.utc) + timedelta(days=1)
+    return datetime.combine(parsed, time.min, tzinfo=timezone.utc)
 
 
 def add_feedback(complaint, rating, comments=None):

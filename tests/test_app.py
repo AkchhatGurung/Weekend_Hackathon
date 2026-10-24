@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash
 from app import create_app, db
 from app.models import Category, Complaint, ComplaintHistory, Department, User
 from app.services.data import (
+    cancel_complaint,
     create_complaint,
     deactivate_record,
     list_complaints,
@@ -326,6 +327,45 @@ class CampusAppTests(unittest.TestCase):
                 ComplaintHistory.query.order_by(ComplaintHistory.id).all()[-1].action,
                 "Edited",
             )
+
+    def test_complaint_can_be_cancelled_without_being_deleted(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        response = self.client.post("/complaints/1/cancel")
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            complaint = db.session.get(Complaint, 1)
+            self.assertEqual(complaint.status, "Cancelled")
+            self.assertEqual(ComplaintHistory.query.count(), 2)
+            self.assertEqual(ComplaintHistory.query.order_by(ComplaintHistory.id).all()[-1].action, "Cancelled")
+
+    def test_ticket_lookup_and_object_authorization(self):
+        self.login("student@example.edu")
+        self.client.post("/complaints/new", data=self.complaint_form())
+        self.assertEqual(self.client.get("/complaints/ticket/SCG-00000001").status_code, 200)
+        self.client.post("/logout")
+        self.login("other@example.edu")
+        self.assertEqual(self.client.get("/complaints/ticket/SCG-00000001").status_code, 404)
+
+    def test_complaint_listing_supports_pagination_and_filters(self):
+        with self.app.app_context():
+            student = User.query.filter_by(email="student@example.edu").one()
+            category = db.session.get(Category, self.category_id)
+            for index in range(3):
+                create_complaint(
+                    reporter=student,
+                    category=category,
+                    title=f"Complaint {index}",
+                    description="Description",
+                    location="North hall",
+                )
+            db.session.commit()
+        self.login("student@example.edu")
+        response = self.client.get(
+            "/complaints?page=2&per_page=2&status=Submitted&category_id=1"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Page 2 of 2", response.data)
 
     def test_complaint_pages_and_valid_image_render(self):
         self.login("student@example.edu")

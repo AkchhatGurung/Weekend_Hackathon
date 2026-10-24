@@ -25,6 +25,10 @@ from app import db
 from app.auth import login_required
 from app.models import Category, Complaint, Department
 from app.services.data import create_complaint as create_complaint_record
+from app.services.data import cancel_complaint as cancel_complaint_record
+from app.services.data import get_complaint_by_ticket
+from app.services.data import can_access_complaint
+from app.services.data import list_complaints as list_complaints_record
 from app.services.data import update_complaint as update_complaint_record
 
 complaints_bp = Blueprint("complaints", __name__, url_prefix="/complaints")
@@ -92,7 +96,42 @@ def _delete_upload(image_key):
 @complaints_bp.get("")
 @login_required
 def list_complaints():
-    complaints = _visible_query().order_by(Complaint.created_at.desc()).all()
+    department_filter = (
+        g.user.department_id
+        if g.user.role == "officer" and g.user.department_id is not None
+        else -1
+        if g.user.role == "officer"
+        else None
+    )
+    try:
+        page = max(request.args.get("page", 1, type=int), 1)
+        per_page = request.args.get("per_page", 20, type=int)
+        status = request.args.get("status") or None
+        category_id = request.args.get("category_id", type=int)
+        complaints = list_complaints_record(
+            reporter_id=g.user.id if g.user.role in ("student", "staff") else None,
+            department_id=department_filter,
+            status=status,
+            category_id=category_id,
+            date_from=request.args.get("date_from") or None,
+            date_to=request.args.get("date_to") or None,
+            page=page,
+            per_page=per_page,
+        )
+    except ValueError as error:
+        flash(str(error), "error")
+        complaints = list_complaints_record(
+            reporter_id=g.user.id if g.user.role in ("student", "staff") else None,
+            department_id=department_filter,
+            page=1,
+            per_page=20,
+        )
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not list complaints.")
+        return render_template(
+            "error.html", message="Complaints could not be loaded. Please try again."
+        ), 503
     return render_template("complaints/list.html", complaints=complaints)
 
 
@@ -147,6 +186,24 @@ def create_complaint():
 @login_required
 def view_complaint(complaint_id):
     complaint = _visible_complaint(complaint_id)
+    return render_template("complaints/detail.html", complaint=complaint)
+
+
+@complaints_bp.get("/ticket/<ticket_id>")
+@login_required
+def view_complaint_by_ticket(ticket_id):
+    try:
+        complaint = get_complaint_by_ticket(ticket_id)
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not load complaint ticket %s.", ticket_id)
+        return render_template(
+            "error.html", message="The complaint could not be loaded. Please try again."
+        ), 503
+    if complaint is None:
+        abort(404)
+    if not can_access_complaint(g.user, complaint):
+        abort(404)
     return render_template("complaints/detail.html", complaint=complaint)
 
 
@@ -205,6 +262,29 @@ def edit_complaint(complaint_id):
     return render_template(
         "complaints/form.html", complaint=complaint, categories=categories
     )
+
+
+@complaints_bp.post("/<int:complaint_id>/cancel")
+@login_required
+def cancel_complaint(complaint_id):
+    complaint = _visible_complaint(complaint_id)
+    try:
+        cancel_complaint_record(
+            complaint,
+            g.user,
+            request.form.get("remarks", "Complaint cancelled by reporter."),
+        )
+        db.session.commit()
+    except ValueError as error:
+        db.session.rollback()
+        flash(str(error), "error")
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not cancel complaint %s.", complaint.id)
+        flash("The complaint could not be cancelled. Please try again.", "error")
+    else:
+        flash("Complaint cancelled.", "success")
+    return redirect(url_for("complaints.view_complaint", complaint_id=complaint.id))
 
 
 @complaints_bp.get("/<int:complaint_id>/image")
