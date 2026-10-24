@@ -66,8 +66,21 @@ Run the focused test suite with:
 python -m unittest discover -s tests -v
 ```
 
-For local testing, user passwords must be at least 3 characters long. Use a
-stronger password outside local testing.
+User passwords must be at least 5 characters long. Use a stronger password
+outside local testing.
+
+Self-registration accepts only student and staff roles. Officer and admin
+accounts must be created by an administrator or through an explicit provisioning
+command. To create sample users for local testing, run:
+
+```powershell
+python -m flask --app app:create_app seed-demo-users
+```
+
+The command prompts for one password and creates demo student, staff, officer,
+and admin accounts only when explicitly invoked. Login errors are intentionally
+generic, inactive accounts cannot log in, and all restricted routes enforce
+permissions on the server.
 
 ## Frontend preview
 

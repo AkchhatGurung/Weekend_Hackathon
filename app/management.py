@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
 
 from app import db
-from app.auth import roles_required
+from app.auth import admin_required
 from app.constants import MIN_PASSWORD_LENGTH
 from app.models import Category, Department, User
 
@@ -15,7 +15,7 @@ EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
 
 @management_bp.get("/")
-@roles_required("admin")
+@admin_required
 def index():
     return render_template(
         "admin/index.html",
@@ -26,7 +26,7 @@ def index():
 
 
 @management_bp.post("/departments")
-@roles_required("admin")
+@admin_required
 def create_department():
     name = request.form.get("name", "").strip()
     if not name or len(name) > 100:
@@ -38,7 +38,7 @@ def create_department():
 
 
 @management_bp.post("/departments/<int:department_id>")
-@roles_required("admin")
+@admin_required
 def update_department(department_id):
     department = db.get_or_404(Department, department_id)
     name = request.form.get("name", "").strip()
@@ -52,7 +52,7 @@ def update_department(department_id):
 
 
 @management_bp.post("/categories")
-@roles_required("admin")
+@admin_required
 def create_category():
     name = request.form.get("name", "").strip()
     department = _selected_department(request.form.get("department_id"))
@@ -72,7 +72,7 @@ def create_category():
 
 
 @management_bp.post("/categories/<int:category_id>")
-@roles_required("admin")
+@admin_required
 def update_category(category_id):
     category = db.get_or_404(Category, category_id)
     name = request.form.get("name", "").strip()
@@ -90,7 +90,7 @@ def update_category(category_id):
 
 
 @management_bp.post("/users")
-@roles_required("admin")
+@admin_required
 def create_user():
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
@@ -123,7 +123,7 @@ def create_user():
 
 
 @management_bp.post("/users/<int:user_id>")
-@roles_required("admin")
+@admin_required
 def update_user(user_id):
     user = db.get_or_404(User, user_id)
     name = request.form.get("name", "").strip()

@@ -7,6 +7,7 @@
     <p>Sign in with your university email to access your complaint workspace.</p>
     <form method="post" action="{{ url_for('auth.login') }}" data-loading-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
       <div class="form-field">
         <label for="email">University email</label>
         <input

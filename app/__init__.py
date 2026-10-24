@@ -84,4 +84,44 @@ def create_app(test_config=None):
         seed()
         click.echo("Campus departments and categories seeded.")
 
+    @app.cli.command("seed-demo-users")
+    @click.password_option(
+        "--password",
+        prompt="Password for demo users",
+        confirmation_prompt=True,
+    )
+    def seed_demo_users(password):
+        """Explicitly create sample accounts for local testing."""
+        from app.models import Department, User
+        from app.services.data import create_user
+
+        if len(password) < MIN_PASSWORD_LENGTH:
+            raise click.ClickException(
+                f"Passwords must be at least {MIN_PASSWORD_LENGTH} characters long."
+            )
+        department = Department.query.filter_by(name="Facilities").first()
+        if department is None:
+            department = Department(name="Facilities")
+            db.session.add(department)
+            db.session.flush()
+        demo_users = (
+            ("Demo Student", "demo.student@example.edu", "student"),
+            ("Demo Staff", "demo.staff@example.edu", "staff"),
+            ("Demo Officer", "demo.officer@example.edu", "officer"),
+            ("Demo Admin", "demo.admin@example.edu", "admin"),
+        )
+        created = 0
+        for name, email, role in demo_users:
+            if User.query.filter_by(email=email).first() is None:
+                create_user(
+                    name,
+                    email,
+                    password,
+                    role,
+                    department if role == "officer" else None,
+                )
+                created += 1
+        db.session.commit()
+        click.echo(f"Created {created} demo user(s).")
+
     return app

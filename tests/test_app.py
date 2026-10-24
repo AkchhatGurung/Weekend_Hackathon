@@ -119,6 +119,99 @@ class CampusAppTests(unittest.TestCase):
             follow_redirects=True,
         )
 
+    def test_valid_login_and_logout(self):
+        response = self.client.post(
+            "/login",
+            data={
+                "email": "student@example.edu",
+                "password": "correct-horse-battery",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/complaints", response.headers["Location"])
+
+        response = self.client.post("/logout")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/login")
+        self.assertEqual(self.client.get("/complaints").status_code, 302)
+
+    def test_invalid_and_inactive_logins_use_generic_error(self):
+        for email, password in (
+            ("student@example.edu", "wrong-password"),
+            ("missing@example.edu", "wrong-password"),
+        ):
+            with self.subTest(email=email):
+                response = self.client.post(
+                    "/login",
+                    data={"email": email, "password": password},
+                    follow_redirects=True,
+                )
+                self.assertIn(b"Invalid email or password.", response.data)
+
+        with self.app.app_context():
+            user = User.query.filter_by(email="student@example.edu").one()
+            user.is_active = False
+            db.session.commit()
+        response = self.client.post(
+            "/login",
+            data={
+                "email": "student@example.edu",
+                "password": "correct-horse-battery",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn(b"Invalid email or password.", response.data)
+
+    def test_role_restrictions_are_enforced_server_side(self):
+        self.login("student@example.edu")
+        self.assertEqual(self.client.get("/admin/").status_code, 403)
+        self.assertEqual(self.client.post("/admin/users").status_code, 403)
+
+        self.client.post("/logout")
+        self.login("officer@example.edu")
+        self.assertEqual(self.client.get("/admin/").status_code, 403)
+
+    def test_registration_allows_staff_but_not_privileged_roles(self):
+        response = self.client.post(
+            "/register",
+            data={
+                "name": "New Staff",
+                "email": "new-staff@example.edu",
+                "role": "staff",
+                "password": "staff123",
+                "password_confirmation": "staff123",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            user = User.query.filter_by(email="new-staff@example.edu").one()
+            self.assertEqual(user.role, "staff")
+
+        self.client.post("/logout")
+        response = self.client.post(
+            "/register",
+            data={
+                "name": "Invalid Admin",
+                "email": "invalid-admin@example.edu",
+                "role": "admin",
+                "password": "admin123",
+                "password_confirmation": "admin123",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"limited to student and staff roles", response.data)
+
+    def test_login_uses_only_safe_local_redirects(self):
+        response = self.client.post(
+            "/login?next=https://evil.example.test",
+            data={
+                "email": "student@example.edu",
+                "password": "correct-horse-battery",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/complaints")
+
     def test_student_registration_creates_and_signs_in_student(self):
         response = self.client.post(
             "/register",
@@ -145,10 +238,10 @@ class CampusAppTests(unittest.TestCase):
                 {
                     "name": "New Student",
                     "email": "new-student@example.edu",
-                    "password": "short",
-                    "password_confirmation": "short",
+                    "password": "12",
+                    "password_confirmation": "12",
                 },
-                b"at least 12 characters",
+                b"at least 5 characters",
             ),
             (
                 {

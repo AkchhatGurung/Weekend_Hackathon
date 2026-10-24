@@ -82,8 +82,8 @@
         <input id="new-user-email" name="email" type="email" maxlength="255" required>
       </div>
       <div class="form-field">
-        <label for="new-user-password">Initial password (12+ characters)</label>
-        <input id="new-user-password" name="password" type="password" minlength="12" required>
+        <label for="new-user-password">Initial password (5+ characters)</label>
+        <input id="new-user-password" name="password" type="password" minlength="5" required>
       </div>
       <div class="form-field">
         <label for="new-user-role">Role</label>
@@ -109,7 +109,7 @@
             <option value="">Unassigned</option>
             {% for department in departments if department.is_active %}<option value="{{ department.id }}" {% if user.department_id == department.id %}selected{% endif %}>{{ department.name }}</option>{% endfor %}
           </select>
-          <input aria-label="New password (optional)" name="password" type="password" minlength="12" placeholder="New password (optional)">
+          <input aria-label="New password (optional)" name="password" type="password" minlength="5" placeholder="New password (optional)">
           <label class="check"><input type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %}> Active</label>
           <button type="submit">Save</button>
         </form>

@@ -4,7 +4,7 @@
   <section class="card narrow">
     <p class="eyebrow">Join Smart Campus</p>
     <h1>Create your account</h1>
-    <p>Register as a student to submit campus complaints and track their progress.</p>
+    <p>Register as a student or staff member to submit and track campus complaints.</p>
     <form method="post" action="{{ url_for('auth.register') }}" data-loading-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-field">
@@ -33,6 +33,13 @@
           maxlength="255">
       </div>
       <div class="form-field">
+        <label for="role">Account type</label>
+        <select id="role" name="role" required>
+          <option value="student" {% if request.form.get('role', 'student') == 'student' %}selected{% endif %}>Student</option>
+          <option value="staff" {% if request.form.get('role') == 'staff' %}selected{% endif %}>Staff</option>
+        </select>
+      </div>
+      <div class="form-field">
         <label for="password">Password</label>
         <input
           id="password"
@@ -40,9 +47,9 @@
           type="password"
           autocomplete="new-password"
           required
-          minlength="12"
+          minlength="5"
           aria-describedby="password-hint">
-        <p class="form-hint" id="password-hint">Use at least 12 characters.</p>
+        <p class="form-hint" id="password-hint">Use at least 5 characters.</p>
       </div>
       <div class="form-field">
         <label for="password_confirmation">Confirm password</label>
@@ -52,9 +59,9 @@
           type="password"
           autocomplete="new-password"
           required
-          minlength="12">
+          minlength="5">
       </div>
-      <button type="submit" data-loading-text="Creating account…" aria-live="polite">Create student account</button>
+      <button type="submit" data-loading-text="Creating account…" aria-live="polite">Create account</button>
     </form>
     <p class="auth-switch">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
   </section>

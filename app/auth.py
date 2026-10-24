@@ -1,5 +1,6 @@
 from functools import wraps
 import re
+from urllib.parse import urljoin, urlparse
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
 from flask_login import current_user, login_user, logout_user
@@ -7,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
 
 from app import db
+from app.constants import MIN_PASSWORD_LENGTH
 from app.models import User
 from app.extensions import login_manager
 
@@ -40,6 +42,16 @@ def login_required(view):
     return wrapped_view
 
 
+def _safe_next_url(target):
+    if not target:
+        return None
+    candidate = urlparse(urljoin(request.host_url, target))
+    expected = urlparse(request.host_url)
+    if candidate.scheme in {"http", "https"} and candidate.netloc == expected.netloc:
+        return candidate.path or "/"
+    return None
+
+
 def roles_required(*roles):
     def decorator(view):
         @wraps(view)
@@ -56,6 +68,14 @@ def roles_required(*roles):
     return decorator
 
 
+def officer_required(view):
+    return roles_required("officer", "admin")(view)
+
+
+def admin_required(view):
+    return roles_required("admin")(view)
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if g.user is not None:
@@ -69,12 +89,18 @@ def login():
         if user is None or not user.is_active or not user.check_password(password):
             error = "Invalid email or password."
         else:
-            login_user(user)
-            return redirect(url_for("complaints.list_complaints"))
+            login_user(user, fresh=True)
+            return redirect(
+                _safe_next_url(request.form.get("next") or request.args.get("next"))
+                or url_for("complaints.list_complaints")
+            )
 
     if error:
         flash(error, "error")
-    return render_template("auth/login.html")
+    return render_template(
+        "auth/login.html",
+        next_url=_safe_next_url(request.args.get("next")),
+    )
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -95,18 +121,25 @@ def register():
             or re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is None
         ):
             flash("Enter a valid email address.", "error")
-        elif len(password) < 12:
-            flash("Your password must be at least 12 characters long.", "error")
+        elif len(password) < MIN_PASSWORD_LENGTH:
+            flash(
+                f"Your password must be at least {MIN_PASSWORD_LENGTH} characters long.",
+                "error",
+            )
         elif password != password_confirmation:
             flash("The password confirmation does not match.", "error")
         elif User.query.filter_by(email=email).first() is not None:
             flash("An account with that email already exists. Please sign in.", "error")
         else:
+            requested_role = request.form.get("role", "student")
+            if requested_role not in {"student", "staff"}:
+                flash("Self-registration is limited to student and staff roles.", "error")
+                return render_template("auth/register.html")
             user = User(
                 name=name,
                 email=email,
                 password_hash=generate_password_hash(password),
-                role="student",
+                role=requested_role,
             )
             db.session.add(user)
             try:
@@ -116,7 +149,10 @@ def register():
                 flash("An account with that email already exists. Please sign in.", "error")
             else:
                 login_user(user)
-                flash("Your student account is ready. Welcome to Smart Campus!", "success")
+                flash(
+                    f"Your {requested_role} account is ready. Welcome to Smart Campus!",
+                    "success",
+                )
                 return redirect(url_for("complaints.list_complaints"))
 
     return render_template("auth/register.html")
